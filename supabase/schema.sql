@@ -169,7 +169,8 @@ grant select, insert, update, delete on
   public.activities,
   public.privacy_settings
 to authenticated;
-grant default privileges in schema public to authenticated;
+alter default privileges in schema public
+  grant select, insert, update, delete on tables to authenticated;
 
 -- ---------- Row Level Security ----------
 -- The universe is private: only authenticated Mikrokosmos members can
