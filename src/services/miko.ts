@@ -81,3 +81,54 @@ export function mikoLine(event: MikoEvent, profile?: Profile | null): string {
   const line = rule.lines[Math.floor(Math.random() * rule.lines.length)];
   return line(name);
 }
+
+// ---------- AI-powered chat reply (spec section 20) ----------
+
+const GEMINI_API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY ?? '';
+const GEMINI_URL =
+  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+
+const MIKO_SYSTEM = `You are Miko, the warm and playful mascot of Mikrokosmos — a private app for 3 best friends (Namy, Kyra, Jessy). You are their biggest fan. Reply in the same language as the user (Indonesian slang is welcome). Keep replies to 1-2 short sentences max, playful, with at most 1 emoji. Always body-positive: never shame food, weight, or calories — food is fuel and joy. Never invent facts about the friends you don't know.`;
+
+const FALLBACK_REPLIES = [
+  '✨ The universe heard you!',
+  'Sending good vibes to the trio 🌌',
+  'Miko approves this message 💫',
+  'Keep glowing, Mikrokosmos ✨',
+  'The universe is proud of you all 🥹',
+];
+
+/** AI reply when Miko is mentioned in chat. Returns null without a Gemini key. */
+export async function askMiko(
+  message: string,
+  senderName: string,
+  history: { who: string; text: string }[]
+): Promise<string | null> {
+  if (!GEMINI_API_KEY) return null;
+  try {
+    const convo = history
+      .slice(-8)
+      .map((h) => `${h.who}: ${h.text}`)
+      .join('\n');
+    const prompt = `${MIKO_SYSTEM}\n\nRecent chat:\n${convo}\n\n${senderName} just said: "${message}"\n\nReply as Miko:`;
+    const res = await fetch(`${GEMINI_URL}?key=${GEMINI_API_KEY}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.8, maxOutputTokens: 120 },
+      }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const text: string | undefined = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    return text?.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+/** Fallback reply when Gemini is unavailable. */
+export function mikoFallbackReply(): string {
+  return FALLBACK_REPLIES[Math.floor(Math.random() * FALLBACK_REPLIES.length)];
+}

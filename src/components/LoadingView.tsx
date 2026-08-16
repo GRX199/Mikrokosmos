@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { ActivityIndicator, Animated, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Animated, Platform, StyleSheet, Text, View } from 'react-native';
 
 import { useAppTheme } from '@/core/theme';
 import { PrimaryButton } from './PrimaryButton';
@@ -10,10 +10,12 @@ export function LoadingView({ label = 'Opening your universe…' }: { label?: st
   const pulse = useRef(new Animated.Value(0.4)).current;
 
   useEffect(() => {
+    // Web has no native animated driver — JS driver there, native elsewhere.
+    const useNativeDriver = Platform.OS !== 'web';
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(pulse, { toValue: 1, duration: 700, useNativeDriver: true }),
-        Animated.timing(pulse, { toValue: 0.4, duration: 700, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 1, duration: 700, useNativeDriver }),
+        Animated.timing(pulse, { toValue: 0.4, duration: 700, useNativeDriver }),
       ])
     );
     loop.start();

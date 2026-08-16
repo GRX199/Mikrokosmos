@@ -27,12 +27,14 @@ import {
   fetchMessages,
   fetchReactions,
   sendMessage,
+  sendMikoMessage,
   subscribeToMessages,
   toggleReaction,
 } from '@/repositories/chat';
 import { fetchProfiles } from '@/repositories/profiles';
 import { resolveMediaUrl, uploadImage } from '@/repositories/storage';
 import { useAuth } from '@/features/auth/SessionProvider';
+import { askMiko, mikoFallbackReply } from '@/services/miko';
 
 /** Mikrokosmos chat — the trio's private living room (spec section 19). */
 export default function ChatScreen() {
@@ -114,6 +116,9 @@ export default function ChatScreen() {
     try {
       await sendMessage(profile.id, { message: text, reply_to: replyId });
       if (!isSupabaseRealtime()) await load(); // mock mode: refresh manually
+      // Miko replies to messages that mention her (only on the sender's device,
+      // so the bot never gets duplicated across the 3 friends).
+      void maybeAskMiko(text, profile);
     } finally {
       setSending(false);
     }
@@ -151,6 +156,24 @@ export default function ChatScreen() {
     );
     await toggleReaction(target.id, profile.id, emoji, existing);
     await loadReactions([target]);
+  }
+
+  async function maybeAskMiko(text: string, sender: Profile) {
+    if (!/\bmiko\b/i.test(text)) return;
+    try {
+      const reply = await askMiko(
+        text,
+        sender.display_name,
+        messages.map((m) => ({
+          who: m.is_bot ? 'Miko' : profileMap[m.sender_id ?? '']?.display_name ?? 'Friend',
+          text: m.message,
+        }))
+      );
+      await sendMikoMessage(reply ?? mikoFallbackReply());
+      if (!isSupabaseRealtime()) await load();
+    } catch {
+      // Miko stays silent rather than breaking the chat.
+    }
   }
 
   if (loading) return <LoadingView label="Opening the group chat…" />;

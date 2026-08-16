@@ -178,8 +178,11 @@ export async function deleteTask(taskId: string): Promise<void> {
 /** Live sync for trend tasks + statuses across the three friends. */
 export function subscribeToTrendChanges(onChange: () => void): () => void {
   if (!isSupabaseConfigured) return () => {};
+  // Each subscription gets its own channel: the trends tab and a trend detail
+  // screen can be mounted at the same time, and reusing one channel name
+  // crashes when the second screen calls .on() after .subscribe().
   const channel = getSupabase()
-    .channel('mikrokosmos-trends')
+    .channel(`mikrokosmos-trends-${Math.random().toString(36).slice(2)}`)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'trend_tasks' }, onChange)
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'trends' }, onChange)
     .subscribe();

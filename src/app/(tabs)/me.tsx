@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -77,6 +78,13 @@ export default function MeScreen() {
   }
 
   function confirmLogout() {
+    if (Platform.OS === 'web') {
+      // React Native's Alert is a no-op on web — use the browser dialog instead.
+      if (window.confirm('Log out? You can always come back to your universe ✨')) {
+        signOut();
+      }
+      return;
+    }
     Alert.alert('Log out?', 'You can always come back to your universe ✨', [
       { text: 'Stay', style: 'cancel' },
       { text: 'Log out', onPress: () => signOut() },

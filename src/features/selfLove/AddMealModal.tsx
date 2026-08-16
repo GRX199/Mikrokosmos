@@ -18,7 +18,7 @@ import { MEAL_TYPES, RADIUS, useAppTheme } from '@/core/theme';
 import { nowTime } from '@/core/utils/date';
 import type { Meal, MealType } from '@/models';
 import type { MealInput } from '@/repositories/meals';
-import { analyzeFoodPhoto, type FoodAnalysis } from '@/services/calorieAnalyzer';
+import { analyzeFoodPhoto, estimateFoodByName, type FoodAnalysis } from '@/services/calorieAnalyzer';
 
 /**
  * Add / edit meal sheet (spec sections 12 + 13).
@@ -47,6 +47,8 @@ export function AddMealModal({
   const [analysis, setAnalysis] = useState<FoodAnalysis | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [imageBase64, setImageBase64] = useState<string | null>(null);
+  const [nameHint, setNameHint] = useState<string | null>(null);
 
   // Reset / prefill when opening.
   useEffect(() => {
@@ -67,6 +69,7 @@ export function AddMealModal({
       setImageUri(null);
     }
     setAnalysis(null);
+    setNameHint(null);
   }, [visible, initial]);
 
   async function pickPhoto() {
@@ -74,10 +77,13 @@ export function AddMealModal({
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
         quality: 0.7,
+        base64: true,
       });
       if (!result.canceled && result.assets[0]) {
         setImageUri(result.assets[0].uri);
+        setImageBase64(result.assets[0].base64 ?? null);
         setAnalysis(null);
+        setNameHint(null);
       }
     } catch {
       // Photo picking is optional — never block logging.
@@ -87,11 +93,33 @@ export function AddMealModal({
   async function runAnalysis() {
     if (!imageUri) return;
     setAnalyzing(true);
+    setNameHint(null);
     try {
-      const result = await analyzeFoodPhoto(imageUri);
-      setAnalysis(result);
-      setName(result.mealName);
-      setCalories(String(result.totalCalories));
+      const result = await analyzeFoodPhoto(imageUri, imageBase64);
+      if (result) {
+        setAnalysis(result);
+        setName(result.mealName);
+        setCalories(String(result.totalCalories));
+      } else {
+        setNameHint('Add EXPO_PUBLIC_GEMINI_API_KEY to enable photo analysis.');
+      }
+    } finally {
+      setAnalyzing(false);
+    }
+  }
+
+  async function runNameEstimate() {
+    if (!name.trim()) return;
+    setAnalyzing(true);
+    setNameHint(null);
+    try {
+      const result = await estimateFoodByName(name.trim());
+      if (result) {
+        setAnalysis(result);
+        setCalories(String(result.totalCalories));
+      } else {
+        setNameHint('No match found — try a different name or add a photo.');
+      }
     } finally {
       setAnalyzing(false);
     }
@@ -223,12 +251,24 @@ export function AddMealModal({
               ) : null}
 
               {/* Fields */}
-              <SoftInput
-                placeholder="Meal name"
-                value={name}
-                onChangeText={setName}
-                containerStyle={styles.field}
-              />
+              <View style={styles.nameRow}>
+                <SoftInput
+                  placeholder="Meal name"
+                  value={name}
+                  onChangeText={(t) => { setName(t); setAnalysis(null); setNameHint(null); }}
+                  containerStyle={styles.nameInput}
+                />
+                <Pressable
+                  onPress={runNameEstimate}
+                  disabled={!name.trim() || analyzing}
+                  style={[styles.nameEstimateBtn, { borderColor: palette.border, opacity: name.trim() && !analyzing ? 1 : 0.4 }]}
+                >
+                  <Text style={[styles.nameEstimateText, { color: theme.accent }]}>✨</Text>
+                </Pressable>
+              </View>
+              {nameHint ? (
+                <Text style={[styles.nameHint, { color: palette.textFaint }]}>{nameHint}</Text>
+              ) : null}
               <SoftInput
                 placeholder="Calories (optional)"
                 value={calories}
@@ -381,6 +421,32 @@ const styles = StyleSheet.create({
   },
   field: {
     marginBottom: 10,
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
+  nameInput: {
+    flex: 1,
+    marginBottom: 0,
+  },
+  nameEstimateBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  nameEstimateText: {
+    fontSize: 18,
+  },
+  nameHint: {
+    fontSize: 11.5,
+    marginBottom: 8,
+    fontStyle: 'italic',
   },
   timeRow: {
     flexDirection: 'row',
