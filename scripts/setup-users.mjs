@@ -61,12 +61,29 @@ async function signup(member) {
   });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {
+    // Already registered → fall back to password sign-in below.
+    if (body?.error_code === 'user_already_exists') return null;
     throw new Error(`signup failed for ${member.username}: ${res.status} ${JSON.stringify(body)}`);
   }
   // If the account already exists, GoTrue may return the user without a session.
   if (!body.access_token) {
-    console.log(`  ${member.username}: already exists (no session returned). Profile step skipped — login once to sync.`);
     return null;
+  }
+  return body;
+}
+
+// Existing account but no session from signup → sign in with password instead
+// so we can still repair missing profile rows on re-runs.
+async function signin(member) {
+  const email = `${member.username}@${EMAIL_DOMAIN}`;
+  const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+    method: 'POST',
+    headers: { apikey: ANON_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password: member.tempPassword }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok || !body.access_token) {
+    throw new Error(`signin failed for ${member.username}: ${res.status} ${JSON.stringify(body)}`);
   }
   return body;
 }
@@ -98,11 +115,10 @@ async function upsertProfile(member, auth) {
 console.log(`Setting up Mikrokosmos members on ${SUPABASE_URL}\n`);
 for (const member of MEMBERS) {
   try {
-    const auth = await signup(member);
-    if (auth) {
-      await upsertProfile(member, auth);
-      console.log(`  ✔ ${member.displayName} (@${member.username}) ready — theme: ${member.theme}`);
-    }
+    let auth = await signup(member);
+    if (!auth) auth = await signin(member);
+    await upsertProfile(member, auth);
+    console.log(`  ✔ ${member.displayName} (@${member.username}) ready — theme: ${member.theme}`);
   } catch (err) {
     console.error(`  ✘ ${member.username}: ${err.message}`);
     process.exitCode = 1;

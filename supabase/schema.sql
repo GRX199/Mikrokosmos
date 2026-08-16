@@ -149,6 +149,28 @@ create index if not exists meals_user_date_idx on public.meals (user_id, date);
 create index if not exists trends_status_idx on public.trends (status);
 create index if not exists trend_tasks_trend_idx on public.trend_tasks (trend_id);
 
+-- ---------- Privileges ----------
+-- Fresh projects lock tables down: RLS alone is not enough, the
+-- authenticated/anon roles also need explicit grants. (RLS policies below
+-- still decide WHO sees WHAT; grants only say the API may touch the tables.)
+grant usage on schema public to anon, authenticated;
+grant select, insert, update, delete on
+  public.profiles,
+  public.daily_checkins,
+  public.meals,
+  public.water_logs,
+  public.step_logs,
+  public.goals,
+  public.messages,
+  public.message_reactions,
+  public.trends,
+  public.trend_participants,
+  public.trend_tasks,
+  public.activities,
+  public.privacy_settings
+to authenticated;
+grant default privileges in schema public to authenticated;
+
 -- ---------- Row Level Security ----------
 -- The universe is private: only authenticated Mikrokosmos members can
 -- read/write app data. Signup is closed, so `authenticated` stays 3 people.
@@ -305,11 +327,30 @@ create policy "members manage own privacy settings" on public.privacy_settings
 
 -- ---------- Realtime ----------
 -- Chat + shared checklists sync live.
-alter publication supabase_realtime add table public.messages;
-alter publication supabase_realtime add table public.message_reactions;
-alter publication supabase_realtime add table public.trend_tasks;
-alter publication supabase_realtime add table public.trends;
-alter publication supabase_realtime add table public.activities;
+-- Idempotent adds (re-running this file would otherwise error).
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'messages'
+  ) then alter publication supabase_realtime add table public.messages; end if;
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'message_reactions'
+  ) then alter publication supabase_realtime add table public.message_reactions; end if;
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'trend_tasks'
+  ) then alter publication supabase_realtime add table public.trend_tasks; end if;
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'trends'
+  ) then alter publication supabase_realtime add table public.trends; end if;
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'activities'
+  ) then alter publication supabase_realtime add table public.activities; end if;
+end $$;
 
 -- ---------- Storage ----------
 -- Private bucket for meal photos and chat images.
