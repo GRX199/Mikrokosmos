@@ -123,6 +123,7 @@ export interface Activity {
   user_id?: string | null;
   type: ActivityType;
   text: string;
+  reference_id?: string | null; // optional reference to related record (e.g., meal_id)
   is_bot: boolean;
   created_at: string;
 }

@@ -20,6 +20,19 @@ export async function fetchMealsForDate(userId: string, date: string): Promise<M
   return (data ?? []) as Meal[];
 }
 
+export async function fetchMealById(mealId: string): Promise<Meal | null> {
+  if (!isSupabaseConfigured) {
+    return mockMeals.find((m) => m.id === mealId) ?? null;
+  }
+  const { data, error } = await getSupabase()
+    .from('meals')
+    .select('*')
+    .eq('id', mealId)
+    .single();
+  if (error || !data) return null;
+  return data as Meal;
+}
+
 export async function fetchMealsCount(userId: string): Promise<number> {
   if (!isSupabaseConfigured) return mockMeals.filter((m) => m.user_id === userId).length;
   const { count, error } = await getSupabase()

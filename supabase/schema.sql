@@ -129,6 +129,7 @@ create table if not exists public.activities (
   user_id uuid references public.profiles (id) on delete cascade,
   type text not null,
   text text not null,
+  reference_id uuid, -- optional reference to related record (e.g., meal_id)
   is_bot boolean not null default false,
   created_at timestamptz not null default now()
 );

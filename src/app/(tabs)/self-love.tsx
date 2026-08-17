@@ -184,11 +184,12 @@ export default function SelfLoveScreen() {
     if (editingMeal) {
       await updateMeal(editingMeal.id, { ...input, image_url: imagePath });
     } else {
-      await createMeal(profile.id, date, { ...input, image_url: imagePath });
+      const newMeal = await createMeal(profile.id, date, { ...input, image_url: imagePath });
       await logActivity(
         profile.id,
         'meal',
-        `${profile.display_name} added ${input.meal_name} ${mealMeta(input.meal_type).emoji}`
+        `${profile.display_name} added ${input.meal_name} ${mealMeta(input.meal_type).emoji}`,
+        newMeal.id // reference to the meal for detail view
       );
     }
     setEditingMeal(null);

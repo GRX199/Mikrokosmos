@@ -22,11 +22,13 @@ export async function fetchActivities(limit = 30): Promise<Activity[]> {
 /**
  * Record an activity. `text` is pre-rendered ("Jessy added breakfast 🍓")
  * so the feed renders instantly without joins.
+ * `referenceId` optionally links to a related record (e.g., meal_id).
  */
 export async function logActivity(
   userId: string,
   type: ActivityType,
-  text: string
+  text: string,
+  referenceId?: string | null
 ): Promise<void> {
   if (!isSupabaseConfigured) {
     mockActivities.unshift({
@@ -34,10 +36,16 @@ export async function logActivity(
       user_id: userId,
       type,
       text,
+      reference_id: referenceId ?? null,
       is_bot: false,
       created_at: new Date().toISOString(),
     });
     return;
   }
-  await getSupabase().from('activities').insert({ user_id: userId, type, text });
+  await getSupabase().from('activities').insert({ 
+    user_id: userId, 
+    type, 
+    text,
+    reference_id: referenceId ?? null 
+  });
 }

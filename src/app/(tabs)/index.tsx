@@ -22,6 +22,7 @@ import {
   type HomeData,
 } from '@/features/home/useHomeData';
 import { MorningCheckinModal } from '@/features/home/MorningCheckinModal';
+import { MealDetailModal } from '@/features/home/MealDetailModal';
 import { todayKey } from '@/core/utils/date';
 
 const ACTIVITY_ICONS: Record<string, string> = {
@@ -46,6 +47,7 @@ export default function HomeScreen() {
 
   const [checkinOpen, setCheckinOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [mealDetailId, setMealDetailId] = useState<string | null>(null);
 
   const myCheckin = profile && data ? data.checkins[profile.id] : undefined;
 
@@ -157,6 +159,13 @@ export default function HomeScreen() {
                   // Navigate based on activity type
                   switch (activity.type) {
                     case 'meal':
+                      // Show meal detail modal if we have a reference
+                      if (activity.reference_id) {
+                        setMealDetailId(activity.reference_id);
+                      } else {
+                        router.push('/(tabs)/self-love');
+                      }
+                      break;
                     case 'checkin':
                     case 'water_goal':
                     case 'step_goal':
@@ -189,6 +198,12 @@ export default function HomeScreen() {
           onSubmit={handleCheckin}
         />
       ) : null}
+
+      <MealDetailModal
+        mealId={mealDetailId}
+        visible={mealDetailId !== null}
+        onClose={() => setMealDetailId(null)}
+      />
     </Screen>
   );
 }
