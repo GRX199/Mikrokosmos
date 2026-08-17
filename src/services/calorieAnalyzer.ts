@@ -20,8 +20,7 @@ export interface FoodAnalysis {
 }
 
 const GEMINI_API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY ?? '';
-const GEMINI_URL =
-  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+const GEMINI_MODELS = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro'];
 
 // ---------- Gemini vision: photo → calorie estimate ----------
 
@@ -32,31 +31,36 @@ Use typical portion sizes. Be positive — never mention dieting or judgment. Ro
 
 async function callGeminiVision(base64: string): Promise<FoodAnalysis | null> {
   if (!GEMINI_API_KEY || !base64) return null;
-  try {
-    const res = await fetch(`${GEMINI_URL}?key=${GEMINI_API_KEY}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              { text: PHOTO_PROMPT },
-              { inline_data: { mime_type: 'image/jpeg', data: base64 } },
-            ],
-          },
-        ],
-        generationConfig: { response_mime_type: 'application/json', temperature: 0.3 },
-      }),
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    const text: string | undefined = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!text) return null;
-    const parsed = JSON.parse(text);
-    return normalizeAnalysis(parsed);
-  } catch {
-    return null;
+  
+  for (const model of GEMINI_MODELS) {
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                { text: PHOTO_PROMPT },
+                { inline_data: { mime_type: 'image/jpeg', data: base64 } },
+              ],
+            },
+          ],
+          generationConfig: { response_mime_type: 'application/json', temperature: 0.3 },
+        }),
+      });
+      if (!res.ok) continue;
+      const data = await res.json();
+      const text: string | undefined = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!text) continue;
+      const parsed = JSON.parse(text);
+      return normalizeAnalysis(parsed);
+    } catch {
+      continue;
+    }
   }
+  return null;
 }
 
 // ---------- Gemini text: food name → calorie estimate ----------
@@ -68,24 +72,29 @@ Use typical portion sizes. Be positive — never mention dieting or judgment. Ro
 
 async function callGeminiText(name: string): Promise<FoodAnalysis | null> {
   if (!GEMINI_API_KEY) return null;
-  try {
-    const res = await fetch(`${GEMINI_URL}?key=${GEMINI_API_KEY}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: NAME_PROMPT(name) }] }],
-        generationConfig: { response_mime_type: 'application/json', temperature: 0.3 },
-      }),
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    const text: string | undefined = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!text) return null;
-    const parsed = JSON.parse(text);
-    return normalizeAnalysis(parsed);
-  } catch {
-    return null;
+  
+  for (const model of GEMINI_MODELS) {
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: NAME_PROMPT(name) }] }],
+          generationConfig: { response_mime_type: 'application/json', temperature: 0.3 },
+        }),
+      });
+      if (!res.ok) continue;
+      const data = await res.json();
+      const text: string | undefined = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!text) continue;
+      const parsed = JSON.parse(text);
+      return normalizeAnalysis(parsed);
+    } catch {
+      continue;
+    }
   }
+  return null;
 }
 
 function normalizeAnalysis(raw: unknown): FoodAnalysis | null {
