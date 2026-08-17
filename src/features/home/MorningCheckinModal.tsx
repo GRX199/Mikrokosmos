@@ -8,6 +8,7 @@ import {
   View,
 } from 'react-native';
 
+import { Ionicons } from '@expo/vector-icons';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { RoundedCard } from '@/components/RoundedCard';
 import { MOODS, RADIUS, useAppTheme } from '@/core/theme';
@@ -22,10 +23,12 @@ export function MorningCheckinModal({
   visible,
   profile,
   onSubmit,
+  onClose,
 }: {
   visible: boolean;
   profile: Profile;
   onSubmit: (wakeUpTime: string, mood: Mood) => Promise<void>;
+  onClose?: () => void;
 }) {
   const { theme, palette } = useAppTheme();
   const [wakeTime, setWakeTime] = useState(() => nowTime());
@@ -55,6 +58,12 @@ export function MorningCheckinModal({
       <View style={[styles.backdrop, { backgroundColor: palette.overlay }]}>
         <View style={styles.sheetWrap}>
           <RoundedCard style={styles.sheet}>
+            {/* Close button */}
+            {onClose ? (
+              <Pressable style={styles.closeButton} onPress={onClose}>
+                <Ionicons name="close" size={22} color={palette.textSecondary} />
+              </Pressable>
+            ) : null}
             <Text style={styles.bigEmoji}>☀️</Text>
             <Text style={[styles.title, { color: palette.text }]}>
               Good morning, {profile.display_name}
@@ -135,6 +144,13 @@ const styles = StyleSheet.create({
   sheet: {
     alignItems: 'center',
     padding: 24,
+  },
+  closeButton: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    padding: 4,
+    zIndex: 1,
   },
   bigEmoji: {
     fontSize: 42,

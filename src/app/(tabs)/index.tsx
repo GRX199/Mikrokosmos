@@ -194,6 +194,7 @@ export default function HomeScreen() {
           visible={checkinOpen}
           profile={profile}
           onSubmit={handleCheckin}
+          onClose={() => setCheckinOpen(false)}
         />
       ) : null}
 
