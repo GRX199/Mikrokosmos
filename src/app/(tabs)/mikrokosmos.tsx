@@ -37,6 +37,7 @@ import { useAuth } from '@/features/auth/SessionProvider';
 import { askMiko, mikoFallbackReply, getQuotaExceededMessage, isQuotaExceeded } from '@/services/miko';
 import { clearUnread, incrementUnread } from '@/stores/unreadChatStore';
 import { useFocusEffect } from 'expo-router';
+import { useRef } from 'react';
 
 /** Mikrokosmos chat — the trio's private living room (spec section 19). */
 export default function ChatScreen() {
@@ -45,12 +46,17 @@ export default function ChatScreen() {
   const insets = useSafeAreaInsets();
   const listRef = useRef<FlatList<ChatMessage>>(null);
   const [isFocused, setIsFocused] = useState(true);
+  const isFocusedRef = useRef(true);
 
   useFocusEffect(
     useCallback(() => {
       setIsFocused(true);
+      isFocusedRef.current = true;
       clearUnread();
-      return () => setIsFocused(false);
+      return () => {
+        setIsFocused(false);
+        isFocusedRef.current = false;
+      };
     }, [])
   );
 
@@ -102,13 +108,13 @@ export default function ChatScreen() {
         prev.some((m) => m.id === incoming.id) ? prev : [...prev, incoming]
       );
       loadReactions([incoming]);
-      // Increment unread if chat is not focused
-      if (!isFocused) {
+      // Increment unread if chat is not focused (use ref to avoid recreating subscription)
+      if (!isFocusedRef.current) {
         incrementUnread();
       }
     });
     return unsubscribe;
-  }, [loadReactions, isFocused]);
+  }, [loadReactions]);
 
   useEffect(() => {
     // Scroll to bottom on initial load and when new messages arrive
