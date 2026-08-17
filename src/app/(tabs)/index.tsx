@@ -48,6 +48,7 @@ export default function HomeScreen() {
   const [checkinOpen, setCheckinOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [mealDetailId, setMealDetailId] = useState<string | null>(null);
+  const [mealActivityText, setMealActivityText] = useState<string | null>(null);
 
   const myCheckin = profile && data ? data.checkins[profile.id] : undefined;
 
@@ -159,12 +160,9 @@ export default function HomeScreen() {
                   // Navigate based on activity type
                   switch (activity.type) {
                     case 'meal':
-                      // Show meal detail modal if we have a reference
-                      if (activity.reference_id) {
-                        setMealDetailId(activity.reference_id);
-                      } else {
-                        router.push('/(tabs)/self-love');
-                      }
+                      // Always show meal detail modal for meal activities
+                      setMealDetailId(activity.reference_id ?? null);
+                      setMealActivityText(activity.text);
                       break;
                     case 'checkin':
                     case 'water_goal':
@@ -201,8 +199,12 @@ export default function HomeScreen() {
 
       <MealDetailModal
         mealId={mealDetailId}
-        visible={mealDetailId !== null}
-        onClose={() => setMealDetailId(null)}
+        activityText={mealActivityText}
+        visible={mealDetailId !== null || mealActivityText !== null}
+        onClose={() => {
+          setMealDetailId(null);
+          setMealActivityText(null);
+        }}
       />
     </Screen>
   );

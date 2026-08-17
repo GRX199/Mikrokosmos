@@ -12,13 +12,16 @@ import { resolveMediaUrl } from '@/repositories/storage';
 /**
  * Modal that shows meal details (name, calories, components, photo).
  * Used when clicking a meal activity in the Recent Activity feed.
+ * If mealId is null, shows activityText as fallback.
  */
 export function MealDetailModal({
   mealId,
+  activityText,
   visible,
   onClose,
 }: {
   mealId: string | null;
+  activityText?: string | null;
   visible: boolean;
   onClose: () => void;
 }) {
@@ -47,6 +50,9 @@ export function MealDetailModal({
 
   if (!visible) return null;
 
+  // Fallback display when no meal data is available
+  const displayName = meal?.meal_name ?? activityText ?? 'Meal Details';
+
   return (
     <Modal
       visible={visible}
@@ -64,11 +70,15 @@ export function MealDetailModal({
               </Text>
               <View style={styles.flex}>
                 <Text style={[styles.title, { color: palette.text }]}>
-                  {loading ? 'Loading...' : meal?.meal_name ?? 'Meal Details'}
+                  {loading ? 'Loading...' : displayName}
                 </Text>
                 {meal ? (
                   <Text style={[styles.subtitle, { color: palette.textSecondary }]}>
                     {mealMeta(meal.meal_type).label} · {shortTime(meal.meal_time)}
+                  </Text>
+                ) : activityText ? (
+                  <Text style={[styles.subtitle, { color: palette.textSecondary }]}>
+                    Meal activity
                   </Text>
                 ) : null}
               </View>
@@ -118,8 +128,17 @@ export function MealDetailModal({
               </ScrollView>
             ) : !loading ? (
               <View style={styles.emptyState}>
+                <Text style={[styles.emptyEmoji]}>🍱</Text>
                 <Text style={[styles.emptyText, { color: palette.textSecondary }]}>
-                  Meal details not available
+                  {activityText ? 'Meal logged' : 'Meal details not available'}
+                </Text>
+                {!activityText ? (
+                  <Text style={[styles.emptySubtext, { color: palette.textFaint }]}>
+                    This meal was logged before detailed tracking was enabled.
+                  </Text>
+                ) : null}
+                <Text style={[styles.disclaimer, { color: palette.textFaint }]}>
+                  ✨ Estimates may vary. Food is fuel and joy — no judgment here.
                 </Text>
               </View>
             ) : null}
@@ -206,7 +225,17 @@ const styles = StyleSheet.create({
     padding: 32,
     alignItems: 'center',
   },
+  emptyEmoji: {
+    fontSize: 48,
+    marginBottom: 12,
+  },
   emptyText: {
     fontSize: 14,
+    fontWeight: '600',
+  },
+  emptySubtext: {
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 8,
   },
 });
