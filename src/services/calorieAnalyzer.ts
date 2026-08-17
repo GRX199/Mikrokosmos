@@ -27,6 +27,10 @@ const GROQ_API_KEY = process.env.EXPO_PUBLIC_GROQ_API_KEY ?? '';
 const GROQ_MODEL = 'llama-3.3-70b-versatile';
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
+// Hugging Face for vision (image captioning, 1000 req/day free)
+const HF_API_KEY = process.env.EXPO_PUBLIC_HF_API_KEY ?? '';
+const HF_CAPTION_URL = 'https://api-inference.huggingface.co/models/nlpconnect/vit-gpt2-image-captioning';
+
 // ---------- Gemini vision: photo → calorie estimate ----------
 
 const PHOTO_PROMPT = `You are a nutrition assistant. Analyze the food in this photo and estimate calories.
@@ -290,18 +294,50 @@ function estimateFromLocalDB(name: string): FoodAnalysis | null {
   };
 }
 
+// ---------- Hugging Face vision: photo → caption → calorie estimate ----------
+
+async function callHFVision(base64: string): Promise<FoodAnalysis | null> {
+  if (!HF_API_KEY || !base64) return null;
+  try {
+    // Convert base64 to blob for HF API
+    const binaryStr = atob(base64);
+    const bytes = new Uint8Array(binaryStr.length);
+    for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
+    const blob = new Blob([bytes], { type: 'image/jpeg' });
+
+    const res = await fetch(HF_CAPTION_URL, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${HF_API_KEY}` },
+      body: blob,
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const caption: string | undefined = data?.[0]?.generated_text;
+    if (!caption) return null;
+    console.log('[CalorieAnalyzer] HF caption:', caption);
+    // Use Groq to estimate calories from the caption
+    return callGroqText(caption);
+  } catch (err) {
+    console.warn('[CalorieAnalyzer] HF vision error:', err);
+    return null;
+  }
+}
+
 // ---------- Public API ----------
 
 /**
- * Analyze a food photo. Pass `base64` (from expo-image-picker's base64 option)
- * for Gemini vision. Without a Gemini key, returns null.
+ * Analyze a food photo. Tries HF vision + Groq first (1000 req/day),
+ * then falls back to Gemini vision (20 req/day).
  */
 export async function analyzeFoodPhoto(
   _imageUri: string,
   base64?: string | null
 ): Promise<FoodAnalysis | null> {
-  // Simulate a tiny bit of latency so the UI shows its analyzing state.
   await new Promise((resolve) => setTimeout(resolve, 400));
+  // 1. Try Hugging Face captioning + Groq calorie estimation (high quota)
+  const hfResult = await callHFVision(base64 ?? '');
+  if (hfResult) return hfResult;
+  // 2. Fallback to Gemini vision (limited quota)
   return callGeminiVision(base64 ?? '');
 }
 
