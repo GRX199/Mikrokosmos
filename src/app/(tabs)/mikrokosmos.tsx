@@ -34,7 +34,7 @@ import {
 import { fetchProfiles } from '@/repositories/profiles';
 import { resolveMediaUrl, uploadImage } from '@/repositories/storage';
 import { useAuth } from '@/features/auth/SessionProvider';
-import { askMiko, mikoFallbackReply } from '@/services/miko';
+import { askMiko, mikoFallbackReply, getQuotaExceededMessage, isQuotaExceeded } from '@/services/miko';
 import { clearUnread, incrementUnread } from '@/stores/unreadChatStore';
 import { useIsFocused } from '@react-navigation/native';
 
@@ -185,7 +185,9 @@ export default function ChatScreen() {
           text: m.message,
         }))
       );
-      await sendMikoMessage(reply ?? mikoFallbackReply());
+      // Use quota message if quota exceeded, otherwise use reply or fallback
+      const mikoReply = reply ?? (isQuotaExceeded() ? getQuotaExceededMessage() : mikoFallbackReply());
+      await sendMikoMessage(mikoReply);
       if (!isSupabaseRealtime()) await load();
     } catch {
       // Miko stays silent rather than breaking the chat.

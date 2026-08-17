@@ -117,6 +117,31 @@ const FALLBACK_REPLIES = [
   'The universe is proud of you all 🥹',
 ];
 
+// Track quota exceeded to avoid spamming retries
+let quotaExceededUntil = 0;
+
+/** Check if we're currently in a quota cooldown period. */
+export function isQuotaExceeded(): boolean {
+  return Date.now() < quotaExceededUntil;
+}
+
+/** Mark quota as exceeded for the given duration in seconds. */
+function setQuotaExceeded(seconds: number): void {
+  quotaExceededUntil = Date.now() + seconds * 1000;
+  console.warn(`[Miko] Quota exceeded, cooldown for ${seconds}s`);
+}
+
+/** Get a user-friendly message when quota is exceeded. */
+export function getQuotaExceededMessage(): string {
+  const remainingSeconds = Math.ceil((quotaExceededUntil - Date.now()) / 1000);
+  const minutes = Math.ceil(remainingSeconds / 60);
+  if (minutes >= 60) {
+    const hours = Math.ceil(minutes / 60);
+    return `🌌 Miko is resting now (daily limit reached). She'll be back in ${hours}h! Try again later ✨`;
+  }
+  return `🌌 Miko is taking a short break (limit reached). Back in ~${minutes}min ✨`;
+}
+
 /** AI reply when Miko is mentioned in chat. Returns null without a Gemini key. */
 export async function askMiko(
   message: string,
@@ -125,6 +150,12 @@ export async function askMiko(
 ): Promise<string | null> {
   if (!GEMINI_API_KEY) {
     console.log('[Miko] No Gemini API key configured');
+    return null;
+  }
+  
+  // Check if we're in a quota cooldown period
+  if (isQuotaExceeded()) {
+    console.warn('[Miko] Quota cooldown active, using fallback');
     return null;
   }
   
@@ -149,6 +180,19 @@ export async function askMiko(
           generationConfig: { temperature: 0.8, maxOutputTokens: 1024 },
         }),
       });
+      
+      // Handle rate limit / quota exceeded
+      if (res.status === 429) {
+        const errorData = await res.json().catch(() => null);
+        const retryInfo = errorData?.error?.details?.find(
+          (d: any) => d['@type']?.includes('RetryInfo')
+        );
+        const retrySeconds = retryInfo?.retryDelay 
+          ? parseInt(retryInfo.retryDelay) 
+          : 60; // Default 60s if we can't parse
+        setQuotaExceeded(retrySeconds || 60);
+        return null;
+      }
       
       if (res.status === 503 && attempt === 0) {
         console.warn('[Miko] High demand, retrying in 1s...');
