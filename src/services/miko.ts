@@ -85,8 +85,8 @@ export function mikoLine(event: MikoEvent, profile?: Profile | null): string {
 // ---------- AI-powered chat reply (spec section 20) ----------
 
 const GEMINI_API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY ?? '';
-// Try multiple model names in order of preference
-const GEMINI_MODELS = ['gemini-flash-latest', 'gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro'];
+// Only gemini-flash-latest is confirmed working with this key format
+const GEMINI_MODEL = 'gemini-flash-latest';
 
 const MIKO_SYSTEM = `You are Miko, the warm and playful mascot of Mikrokosmos — a private app for 3 best friends (Namy, Kyra, Jessy). You are their biggest fan. Reply in the same language as the user (Indonesian slang is welcome). Keep replies to 1-2 short sentences max, playful, with at most 1 emoji. Always body-positive: never shame food, weight, or calories — food is fuel and joy. Never invent facts about the friends you don't know.`;
 
@@ -115,10 +115,10 @@ export async function askMiko(
     .join('\n');
   const prompt = `${MIKO_SYSTEM}\n\nRecent chat:\n${convo}\n\n${senderName} just said: "${message}"\n\nReply as Miko:`;
 
-  // Try each model until one works
-  for (const model of GEMINI_MODELS) {
+  // Try up to 2 times in case of high demand (503)
+  for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
       const res = await fetch(url, {
         method: 'POST',
         headers: { 
@@ -131,25 +131,30 @@ export async function askMiko(
         }),
       });
       
+      if (res.status === 503 && attempt === 0) {
+        console.warn('[Miko] High demand, retrying in 1s...');
+        await new Promise(r => setTimeout(r, 1000));
+        continue;
+      }
+      
       if (!res.ok) {
         const errorText = await res.text();
-        console.warn(`[Miko] ${model} failed:`, res.status, errorText);
-        continue; // Try next model
+        console.error(`[Miko] ${GEMINI_MODEL} failed:`, res.status, errorText);
+        return null;
       }
       
       const data = await res.json();
       const text: string | undefined = data?.candidates?.[0]?.content?.parts?.[0]?.text;
       if (text?.trim()) {
-        console.log(`[Miko] Success with ${model}:`, text.trim());
+        console.log(`[Miko] Success:`, text.trim());
         return text.trim();
       }
+      return null;
     } catch (err) {
-      console.error(`[Miko] ${model} error:`, err);
-      continue;
+      console.error(`[Miko] error:`, err);
+      return null;
     }
   }
-  
-  console.error('[Miko] All models failed');
   return null;
 }
 

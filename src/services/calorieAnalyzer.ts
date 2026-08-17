@@ -20,7 +20,7 @@ export interface FoodAnalysis {
 }
 
 const GEMINI_API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY ?? '';
-const GEMINI_MODELS = ['gemini-flash-latest', 'gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro'];
+const GEMINI_MODEL = 'gemini-flash-latest';
 
 // ---------- Gemini vision: photo → calorie estimate ----------
 
@@ -32,9 +32,9 @@ Use typical portion sizes. Be positive — never mention dieting or judgment. Ro
 async function callGeminiVision(base64: string): Promise<FoodAnalysis | null> {
   if (!GEMINI_API_KEY || !base64) return null;
   
-  for (const model of GEMINI_MODELS) {
+  for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
       const res = await fetch(url, {
         method: 'POST',
         headers: { 
@@ -53,14 +53,22 @@ async function callGeminiVision(base64: string): Promise<FoodAnalysis | null> {
           generationConfig: { response_mime_type: 'application/json', temperature: 0.3 },
         }),
       });
-      if (!res.ok) continue;
+      if (res.status === 503 && attempt === 0) {
+        await new Promise(r => setTimeout(r, 1000));
+        continue;
+      }
+      if (!res.ok) return null;
       const data = await res.json();
       const text: string | undefined = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (!text) continue;
+      if (!text) return null;
       const parsed = JSON.parse(text);
       return normalizeAnalysis(parsed);
     } catch {
-      continue;
+      if (attempt === 0) {
+        await new Promise(r => setTimeout(r, 1000));
+        continue;
+      }
+      return null;
     }
   }
   return null;
@@ -76,9 +84,9 @@ Use typical portion sizes. Be positive — never mention dieting or judgment. Ro
 async function callGeminiText(name: string): Promise<FoodAnalysis | null> {
   if (!GEMINI_API_KEY) return null;
   
-  for (const model of GEMINI_MODELS) {
+  for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
       const res = await fetch(url, {
         method: 'POST',
         headers: { 
@@ -90,14 +98,22 @@ async function callGeminiText(name: string): Promise<FoodAnalysis | null> {
           generationConfig: { response_mime_type: 'application/json', temperature: 0.3 },
         }),
       });
-      if (!res.ok) continue;
+      if (res.status === 503 && attempt === 0) {
+        await new Promise(r => setTimeout(r, 1000));
+        continue;
+      }
+      if (!res.ok) return null;
       const data = await res.json();
       const text: string | undefined = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (!text) continue;
+      if (!text) return null;
       const parsed = JSON.parse(text);
       return normalizeAnalysis(parsed);
     } catch {
-      continue;
+      if (attempt === 0) {
+        await new Promise(r => setTimeout(r, 1000));
+        continue;
+      }
+      return null;
     }
   }
   return null;
