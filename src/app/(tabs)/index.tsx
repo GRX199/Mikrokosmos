@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -152,6 +153,27 @@ export default function HomeScreen() {
                 key={activity.id}
                 activity={activity}
                 isLast={index === data.activities.length - 1}
+                onPress={() => {
+                  // Navigate based on activity type
+                  switch (activity.type) {
+                    case 'meal':
+                    case 'checkin':
+                    case 'water_goal':
+                    case 'step_goal':
+                      router.push('/(tabs)/self-love');
+                      break;
+                    case 'trend_added':
+                    case 'trend_done':
+                      router.push('/(tabs)/trends');
+                      break;
+                    case 'miko':
+                      router.push('/(tabs)/mikrokosmos');
+                      break;
+                    default:
+                      // memory, achievement, streak — no specific page
+                      break;
+                  }
+                }}
               />
             ))}
           </RoundedCard>
@@ -222,10 +244,17 @@ function FriendCard({
   );
 }
 
-function ActivityRow({ activity, isLast }: { activity: Activity; isLast: boolean }) {
+function ActivityRow({ activity, isLast, onPress }: { activity: Activity; isLast: boolean; onPress: () => void }) {
   const { theme, palette } = useAppTheme();
   return (
-    <View style={[styles.activityRow, !isLast && { borderBottomColor: palette.border, borderBottomWidth: 1 }]}>
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.activityRow,
+        !isLast && { borderBottomColor: palette.border, borderBottomWidth: 1 },
+        pressed && { opacity: 0.7 },
+      ]}
+    >
       <View style={[styles.activityIcon, { backgroundColor: theme.light }]}>
         <Text style={styles.activityEmoji}>{ACTIVITY_ICONS[activity.type] ?? '✨'}</Text>
       </View>
@@ -233,7 +262,8 @@ function ActivityRow({ activity, isLast }: { activity: Activity; isLast: boolean
       <Text style={[styles.activityTime, { color: palette.textFaint }]}>
         {relativeTime(activity.created_at)}
       </Text>
-    </View>
+      <Ionicons name="chevron-forward" size={14} color={palette.textFaint} />
+    </Pressable>
   );
 }
 

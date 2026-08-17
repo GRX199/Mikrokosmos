@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
+  Image,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -32,7 +33,7 @@ import {
 } from '@/repositories/meals';
 import { fetchGoals, fetchProfiles } from '@/repositories/profiles';
 import { logActivity } from '@/repositories/activities';
-import { uploadImage } from '@/repositories/storage';
+import { uploadImage, resolveMediaUrl } from '@/repositories/storage';
 import { fetchWater, setWater, setSteps, fetchSteps, fetchDayStats } from '@/repositories/waterSteps';
 import { sendMikoMessage } from '@/repositories/chat';
 import { mikoLine } from '@/services/miko';
@@ -59,6 +60,7 @@ export default function SelfLoveScreen() {
   const [mealModalOpen, setMealModalOpen] = useState(false);
   const [editingMeal, setEditingMeal] = useState<Meal | null>(null);
   const [stepDraft, setStepDraft] = useState('');
+  const [resolvedImages, setResolvedImages] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
     if (!profile) return;
@@ -110,6 +112,25 @@ export default function SelfLoveScreen() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Resolve image URLs for food diary thumbnails
+  useEffect(() => {
+    async function resolveImages() {
+      const map: Record<string, string> = {};
+      for (const meal of meals) {
+        if (meal.image_url && !resolvedImages[meal.id]) {
+          const url = await resolveMediaUrl(meal.image_url);
+          if (url) map[meal.id] = url;
+        }
+      }
+      if (Object.keys(map).length > 0) {
+        setResolvedImages((prev) => ({ ...prev, ...map }));
+      }
+    }
+    if (meals.length > 0) {
+      void resolveImages();
+    }
+  }, [meals]);
 
   if (loading && !goals) return <LoadingView label="Preparing your self love space…" />;
   if (error && !goals) return <ErrorState message={error} onRetry={load} />;
@@ -359,9 +380,16 @@ export default function SelfLoveScreen() {
                   },
                 ]}
               >
-                <View style={[styles.diaryIcon, { backgroundColor: theme.light }]}>
-                  <Text>{mealMeta(meal.meal_type).emoji}</Text>
-                </View>
+                {resolvedImages[meal.id] ? (
+                  <Image
+                    source={{ uri: resolvedImages[meal.id] }}
+                    style={styles.diaryThumbnail}
+                  />
+                ) : (
+                  <View style={[styles.diaryIcon, { backgroundColor: theme.light }]}>
+                    <Text>{mealMeta(meal.meal_type).emoji}</Text>
+                  </View>
+                )}
                 <View style={styles.flex}>
                   <Text style={[styles.diaryTitle, { color: palette.text }]}>
                     {meal.meal_name}
@@ -554,6 +582,12 @@ const styles = StyleSheet.create({
     borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  diaryThumbnail: {
+    width: 44,
+    height: 44,
+    borderRadius: 10,
+    backgroundColor: '#f0f0f0',
   },
   diaryTitle: {
     fontSize: 14.5,

@@ -1,10 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import type { BottomTabBarProps } from 'expo-router/build/react-navigation/bottom-tabs/types';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MAX_CONTENT_WIDTH, RADIUS, useAppTheme } from '@/core/theme';
+import { subscribeToUnread } from '@/stores/unreadChatStore';
 
 const TAB_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
   index: 'home',
@@ -21,6 +22,11 @@ const TAB_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
 export function CosmicTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const { theme, palette } = useAppTheme();
   const insets = useSafeAreaInsets();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    return subscribeToUnread(setUnreadCount);
+  }, []);
 
   return (
     <View
@@ -61,11 +67,20 @@ export function CosmicTabBar({ state, descriptors, navigation }: BottomTabBarPro
               accessibilityState={{ selected: focused }}
               style={[styles.tab, focused && { backgroundColor: theme.light }]}
             >
-              <Ionicons
-                name={icon}
-                size={22}
-                color={focused ? theme.accent : palette.textFaint}
-              />
+              <View style={styles.iconWrap}>
+                <Ionicons
+                  name={icon}
+                  size={22}
+                  color={focused ? theme.accent : palette.textFaint}
+                />
+                {route.name === 'mikrokosmos' && unreadCount > 0 && !focused && (
+                  <View style={[styles.badge, { backgroundColor: theme.accent }]}>
+                    <Text style={styles.badgeText}>
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </Text>
+                  </View>
+                )}
+              </View>
               <Text
                 numberOfLines={1}
                 style={[
@@ -113,6 +128,27 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: RADIUS.pill,
     gap: 2,
+  },
+  iconWrap: {
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badge: {
+    position: 'absolute',
+    top: -4,
+    right: -8,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  badgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '800',
   },
   label: {
     fontSize: 10,

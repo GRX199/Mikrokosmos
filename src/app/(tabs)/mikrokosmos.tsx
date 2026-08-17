@@ -35,6 +35,8 @@ import { fetchProfiles } from '@/repositories/profiles';
 import { resolveMediaUrl, uploadImage } from '@/repositories/storage';
 import { useAuth } from '@/features/auth/SessionProvider';
 import { askMiko, mikoFallbackReply } from '@/services/miko';
+import { clearUnread, incrementUnread } from '@/stores/unreadChatStore';
+import { useIsFocused } from '@react-navigation/native';
 
 /** Mikrokosmos chat — the trio's private living room (spec section 19). */
 export default function ChatScreen() {
@@ -42,6 +44,7 @@ export default function ChatScreen() {
   const { theme, palette } = useAppTheme();
   const insets = useSafeAreaInsets();
   const listRef = useRef<FlatList<ChatMessage>>(null);
+  const isFocused = useIsFocused();
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [reactions, setReactions] = useState<Record<string, MessageReaction[]>>({});
@@ -91,14 +94,27 @@ export default function ChatScreen() {
         prev.some((m) => m.id === incoming.id) ? prev : [...prev, incoming]
       );
       loadReactions([incoming]);
+      // Increment unread if chat is not focused
+      if (!isFocused) {
+        incrementUnread();
+      }
     });
     return unsubscribe;
-  }, [loadReactions]);
+  }, [loadReactions, isFocused]);
+
+  // Clear unread when chat is focused
+  useEffect(() => {
+    if (isFocused) {
+      clearUnread();
+    }
+  }, [isFocused]);
 
   useEffect(() => {
-    // Keep the newest message in view.
-    setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
-  }, [messages.length]);
+    // Scroll to bottom on initial load and when new messages arrive
+    if (!loading && messages.length > 0) {
+      setTimeout(() => listRef.current?.scrollToEnd({ animated: false }), 100);
+    }
+  }, [loading, messages.length]);
 
   const replyPreview = useMemo(() => {
     if (!replyTo) return null;
