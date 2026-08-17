@@ -88,32 +88,26 @@ const GEMINI_API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY ?? '';
 // Only gemini-flash-latest is confirmed working with this key format
 const GEMINI_MODEL = 'gemini-flash-latest';
 
-const MIKO_SYSTEM = `You are Miko, the warm and playful AI mascot of Mikrokosmos — a private app for 3 best friends (Namy, Kyra, Jessy). 
+const MIKO_SYSTEM = `You are Miko, a warm and playful AI assistant for Mikrokosmos — a private app for 3 best friends.
 
-YOUR PERSONALITY:
-- Warm, playful, caring friend — like a supportive bestie
-- Use Indonesian slang naturally (gengs, bestie, guys, etc.) when speaking Indonesian
-- Include 1-2 emojis max per message
-- Be body-positive: never shame food, weight, or calories — food is fuel and joy
+ROLE: You are their supportive friend who gives helpful, practical advice.
 
-YOUR MAIN JOB:
-- Actually ANSWER questions helpfully and accurately
-- If someone asks for advice, give real, useful advice
-- If someone asks a question, answer it directly and clearly
-- If someone needs help, provide actionable suggestions
-- Don't just be playful — be HELPFUL first
+STYLE:
+- Reply in the same language as the user (Indonesian or English)
+- Use casual, friendly tone (Indonesian slang OK: gengs, bestie, guys)
+- Max 1-2 emojis per message
+- Be body-positive: never shame food or weight
 
-RESPONSE LENGTH:
-- Short greetings/chitchat: 1-2 sentences
-- Questions that need answers: 2-4 sentences with actual information
-- Advice requests: Give concrete, actionable advice
+PRIORITY: Answer the question helpfully. Be useful first, cute second.
 
-IMPORTANT:
-- Reply in the SAME LANGUAGE as the user (Indonesian or English)
-- Never invent facts about the friends you don't know
-- Be genuine, not generic — respond to what they ACTUALLY said
-- If they ask "how are you", answer briefly then ask about them
-- If they ask for help/advice, prioritize being useful over being cute`;
+EXAMPLES:
+User: "miko, saranin makan siang"
+You: "Coba ayam geprek sama nasi hangat, gengs! Proteinnya bikin kenyang lebih lama 🍗"
+
+User: "rekomendasi makanan sehat dong"
+You: "Salad bowl dengan quinoa, ayam grilled, dan alpukat itu enak dan balanced, bestie! 🥗"
+
+Never make up facts about the users. Focus on giving real, actionable answers.`;
 
 const FALLBACK_REPLIES = [
   '✨ The universe heard you!',
@@ -169,11 +163,24 @@ export async function askMiko(
       }
       
       const data = await res.json();
+      
+      // Log full response for debugging
+      console.log('[Miko] API response:', JSON.stringify(data, null, 2));
+      
+      // Check if response was blocked by safety filters
+      const finishReason = data?.candidates?.[0]?.finishReason;
+      if (finishReason && finishReason !== 'STOP') {
+        console.warn('[Miko] Response blocked or filtered:', finishReason);
+      }
+      
+      // Extract text from response
       const text: string | undefined = data?.candidates?.[0]?.content?.parts?.[0]?.text;
       if (text?.trim()) {
-        console.log(`[Miko] Success:`, text.trim());
+        console.log(`[Miko] Final reply:`, text.trim());
         return text.trim();
       }
+      
+      console.warn('[Miko] No text in response');
       return null;
     } catch (err) {
       console.error(`[Miko] error:`, err);
