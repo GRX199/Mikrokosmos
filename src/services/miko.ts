@@ -86,7 +86,7 @@ export function mikoLine(event: MikoEvent, profile?: Profile | null): string {
 
 const GEMINI_API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY ?? '';
 // Try multiple model names in order of preference
-const GEMINI_MODELS = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro'];
+const GEMINI_MODELS = ['gemini-flash-latest', 'gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro'];
 
 const MIKO_SYSTEM = `You are Miko, the warm and playful mascot of Mikrokosmos — a private app for 3 best friends (Namy, Kyra, Jessy). You are their biggest fan. Reply in the same language as the user (Indonesian slang is welcome). Keep replies to 1-2 short sentences max, playful, with at most 1 emoji. Always body-positive: never shame food, weight, or calories — food is fuel and joy. Never invent facts about the friends you don't know.`;
 
@@ -118,10 +118,13 @@ export async function askMiko(
   // Try each model until one works
   for (const model of GEMINI_MODELS) {
     try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
       const res = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-goog-api-key': GEMINI_API_KEY
+        },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: { temperature: 0.8, maxOutputTokens: 120 },
