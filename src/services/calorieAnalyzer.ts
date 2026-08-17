@@ -29,7 +29,11 @@ const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
 // Hugging Face for vision (image captioning, 1000 req/day free)
 const HF_API_KEY = process.env.EXPO_PUBLIC_HF_API_KEY ?? '';
-const HF_CAPTION_URL = 'https://api-inference.huggingface.co/models/nlpconnect/vit-gpt2-image-captioning';
+// Try multiple HF endpoints formats
+const HF_ENDPOINTS = [
+  'https://api-inference.huggingface.co/models/nlpconnect/vit-gpt2-image-captioning',
+  'https://router.huggingface.co/hf-inference/models/nlpconnect/vit-gpt2-image-captioning',
+];
 
 // ---------- Gemini vision: photo → calorie estimate ----------
 
@@ -298,29 +302,38 @@ function estimateFromLocalDB(name: string): FoodAnalysis | null {
 
 async function callHFVision(base64: string): Promise<FoodAnalysis | null> {
   if (!HF_API_KEY || !base64) return null;
-  try {
-    // Convert base64 to blob for HF API
-    const binaryStr = atob(base64);
-    const bytes = new Uint8Array(binaryStr.length);
-    for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
-    const blob = new Blob([bytes], { type: 'image/jpeg' });
+  
+  // Convert base64 to blob for HF API
+  const binaryStr = atob(base64);
+  const bytes = new Uint8Array(binaryStr.length);
+  for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
+  const blob = new Blob([bytes], { type: 'image/jpeg' });
 
-    const res = await fetch(HF_CAPTION_URL, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${HF_API_KEY}` },
-      body: blob,
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    const caption: string | undefined = data?.[0]?.generated_text;
-    if (!caption) return null;
-    console.log('[CalorieAnalyzer] HF caption:', caption);
-    // Use Groq to estimate calories from the caption
-    return callGroqText(caption);
-  } catch (err) {
-    console.warn('[CalorieAnalyzer] HF vision error:', err);
-    return null;
+  // Try multiple HF endpoints
+  for (const endpoint of HF_ENDPOINTS) {
+    try {
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${HF_API_KEY}` },
+        body: blob,
+      });
+      if (!res.ok) {
+        console.warn(`[CalorieAnalyzer] HF ${endpoint} failed:`, res.status);
+        continue;
+      }
+      const data = await res.json();
+      const caption: string | undefined = data?.[0]?.generated_text;
+      if (!caption) continue;
+      console.log('[CalorieAnalyzer] HF caption:', caption);
+      // Use Groq to estimate calories from the caption
+      const result = await callGroqText(caption);
+      if (result) return result;
+    } catch (err) {
+      console.warn(`[CalorieAnalyzer] HF ${endpoint} error:`, err);
+      continue;
+    }
   }
+  return null;
 }
 
 // ---------- Public API ----------
