@@ -86,7 +86,7 @@ export function mikoLine(event: MikoEvent, profile?: Profile | null): string {
 
 // Groq (primary) — free tier: ~14,400 req/day, super fast LPU inference
 const GROQ_API_KEY = process.env.EXPO_PUBLIC_GROQ_API_KEY ?? '';
-const GROQ_MODEL = 'mixtral-8x7b-32768';
+const GROQ_MODEL = 'llama3-8b-instant';
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
 // Gemini (fallback for vision only — food photo analysis)

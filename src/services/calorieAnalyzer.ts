@@ -24,7 +24,7 @@ const GEMINI_MODEL = 'gemini-flash-latest';
 
 // Groq for text-based estimation (much higher free quota)
 const GROQ_API_KEY = process.env.EXPO_PUBLIC_GROQ_API_KEY ?? '';
-const GROQ_MODEL = 'mixtral-8x7b-32768';
+const GROQ_MODEL = 'llama3-8b-instant';
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
 // ---------- Gemini vision: photo → calorie estimate ----------
