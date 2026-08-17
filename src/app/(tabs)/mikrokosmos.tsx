@@ -36,7 +36,7 @@ import { resolveMediaUrl, uploadImage } from '@/repositories/storage';
 import { useAuth } from '@/features/auth/SessionProvider';
 import { askMiko, mikoFallbackReply, getQuotaExceededMessage, isQuotaExceeded } from '@/services/miko';
 import { clearUnread, incrementUnread } from '@/stores/unreadChatStore';
-import { useIsFocused } from '@react-navigation/native';
+import { useFocusEffect } from 'expo-router';
 
 /** Mikrokosmos chat — the trio's private living room (spec section 19). */
 export default function ChatScreen() {
@@ -44,7 +44,15 @@ export default function ChatScreen() {
   const { theme, palette } = useAppTheme();
   const insets = useSafeAreaInsets();
   const listRef = useRef<FlatList<ChatMessage>>(null);
-  const isFocused = useIsFocused();
+  const [isFocused, setIsFocused] = useState(true);
+
+  useFocusEffect(
+    useCallback(() => {
+      setIsFocused(true);
+      clearUnread();
+      return () => setIsFocused(false);
+    }, [])
+  );
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [reactions, setReactions] = useState<Record<string, MessageReaction[]>>({});
@@ -101,13 +109,6 @@ export default function ChatScreen() {
     });
     return unsubscribe;
   }, [loadReactions, isFocused]);
-
-  // Clear unread when chat is focused
-  useEffect(() => {
-    if (isFocused) {
-      clearUnread();
-    }
-  }, [isFocused]);
 
   useEffect(() => {
     // Scroll to bottom on initial load and when new messages arrive
