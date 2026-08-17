@@ -146,7 +146,7 @@ export async function askMiko(
         },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.8, maxOutputTokens: 120 },
+          generationConfig: { temperature: 0.8, maxOutputTokens: 1024 },
         }),
       });
       
