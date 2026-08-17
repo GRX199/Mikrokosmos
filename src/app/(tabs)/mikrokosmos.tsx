@@ -37,7 +37,6 @@ import { useAuth } from '@/features/auth/SessionProvider';
 import { askMiko, mikoFallbackReply, getQuotaExceededMessage, isQuotaExceeded } from '@/services/miko';
 import { clearUnread, incrementUnread } from '@/stores/unreadChatStore';
 import { useFocusEffect } from 'expo-router';
-import { useRef } from 'react';
 
 /** Mikrokosmos chat — the trio's private living room (spec section 19). */
 export default function ChatScreen() {
