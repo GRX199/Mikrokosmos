@@ -84,8 +84,13 @@ export function mikoLine(event: MikoEvent, profile?: Profile | null): string {
 
 // ---------- AI-powered chat reply (spec section 20) ----------
 
+// Groq (primary) — free tier: ~14,400 req/day, super fast LPU inference
+const GROQ_API_KEY = process.env.EXPO_PUBLIC_GROQ_API_KEY ?? '';
+const GROQ_MODEL = 'llama-3.3-70b-versatile';
+const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
+
+// Gemini (fallback for vision only — food photo analysis)
 const GEMINI_API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY ?? '';
-// Only gemini-flash-latest is confirmed working with this key format
 const GEMINI_MODEL = 'gemini-flash-latest';
 
 const MIKO_SYSTEM = `You are Miko, a warm and playful AI assistant for Mikrokosmos — a private app for 3 best friends.
@@ -142,92 +147,135 @@ export function getQuotaExceededMessage(): string {
   return `🌌 Miko is taking a short break (limit reached). Back in ~${minutes}min ✨`;
 }
 
-/** AI reply when Miko is mentioned in chat. Returns null without a Gemini key. */
+/** AI reply when Miko is mentioned in chat. Uses Groq (primary) or Gemini (fallback). */
 export async function askMiko(
   message: string,
   senderName: string,
   history: { who: string; text: string }[]
 ): Promise<string | null> {
-  if (!GEMINI_API_KEY) {
-    console.log('[Miko] No Gemini API key configured');
-    return null;
-  }
-  
-  // Check if we're in a quota cooldown period
-  if (isQuotaExceeded()) {
-    console.warn('[Miko] Quota cooldown active, using fallback');
-    return null;
-  }
-  
   const convo = history
     .slice(-8)
     .map((h) => `${h.who}: ${h.text}`)
     .join('\n');
+
+  // Try Groq first (much higher quota, faster)
+  if (GROQ_API_KEY) {
+    const groqReply = await askGroq(message, senderName, convo);
+    if (groqReply) return groqReply;
+  }
+
+  // Fallback to Gemini if Groq fails or no key
+  if (GEMINI_API_KEY) {
+    return askGemini(message, senderName, convo);
+  }
+
+  if (!GROQ_API_KEY && !GEMINI_API_KEY) {
+    console.log('[Miko] No API key configured (need EXPO_PUBLIC_GROQ_API_KEY or EXPO_PUBLIC_GEMINI_API_KEY)');
+  }
+  return null;
+}
+
+// ---------- Groq (OpenAI-compatible) ----------
+
+async function askGroq(
+  message: string,
+  senderName: string,
+  convo: string
+): Promise<string | null> {
+  try {
+    const res = await fetch(GROQ_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${GROQ_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: GROQ_MODEL,
+        messages: [
+          { role: 'system', content: MIKO_SYSTEM },
+          { role: 'user', content: `Recent chat:\n${convo}\n\n${senderName} just said: "${message}"\n\nReply as Miko:` },
+        ],
+        temperature: 0.8,
+        max_completion_tokens: 256,
+      }),
+    });
+
+    if (res.status === 429) {
+      console.warn('[Miko] Groq rate limited');
+      return null;
+    }
+
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.error('[Miko] Groq failed:', res.status, errorText);
+      return null;
+    }
+
+    const data = await res.json();
+    const text: string | undefined = data?.choices?.[0]?.message?.content;
+    if (text?.trim()) {
+      console.log('[Miko] Groq reply:', text.trim());
+      return text.trim();
+    }
+    return null;
+  } catch (err) {
+    console.error('[Miko] Groq error:', err);
+    return null;
+  }
+}
+
+// ---------- Gemini (fallback) ----------
+
+async function askGemini(
+  message: string,
+  senderName: string,
+  convo: string
+): Promise<string | null> {
+  if (isQuotaExceeded()) {
+    console.warn('[Miko] Gemini quota cooldown active');
+    return null;
+  }
+
   const prompt = `${MIKO_SYSTEM}\n\nRecent chat:\n${convo}\n\n${senderName} just said: "${message}"\n\nReply as Miko:`;
 
-  // Try up to 2 times in case of high demand (503)
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
       const res = await fetch(url, {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
-          'X-goog-api-key': GEMINI_API_KEY
+          'X-goog-api-key': GEMINI_API_KEY,
         },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: { temperature: 0.8, maxOutputTokens: 1024 },
         }),
       });
-      
-      // Handle rate limit / quota exceeded
+
       if (res.status === 429) {
         const errorData = await res.json().catch(() => null);
         const retryInfo = errorData?.error?.details?.find(
           (d: any) => d['@type']?.includes('RetryInfo')
         );
-        const retrySeconds = retryInfo?.retryDelay 
-          ? parseInt(retryInfo.retryDelay) 
-          : 60; // Default 60s if we can't parse
+        const retrySeconds = retryInfo?.retryDelay
+          ? parseInt(retryInfo.retryDelay)
+          : 60;
         setQuotaExceeded(retrySeconds || 60);
         return null;
       }
-      
+
       if (res.status === 503 && attempt === 0) {
-        console.warn('[Miko] High demand, retrying in 1s...');
         await new Promise(r => setTimeout(r, 1000));
         continue;
       }
-      
-      if (!res.ok) {
-        const errorText = await res.text();
-        console.error(`[Miko] ${GEMINI_MODEL} failed:`, res.status, errorText);
-        return null;
-      }
-      
+
+      if (!res.ok) return null;
       const data = await res.json();
-      
-      // Log full response for debugging
-      console.log('[Miko] API response:', JSON.stringify(data, null, 2));
-      
-      // Check if response was blocked by safety filters
-      const finishReason = data?.candidates?.[0]?.finishReason;
-      if (finishReason && finishReason !== 'STOP') {
-        console.warn('[Miko] Response blocked or filtered:', finishReason);
-      }
-      
-      // Extract text from response
       const text: string | undefined = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (text?.trim()) {
-        console.log(`[Miko] Final reply:`, text.trim());
-        return text.trim();
-      }
-      
-      console.warn('[Miko] No text in response');
-      return null;
-    } catch (err) {
-      console.error(`[Miko] error:`, err);
+      return text?.trim() ?? null;
+    } catch {
+      if (attempt === 0) continue;
       return null;
     }
   }

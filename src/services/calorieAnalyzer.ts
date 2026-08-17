@@ -22,6 +22,11 @@ export interface FoodAnalysis {
 const GEMINI_API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY ?? '';
 const GEMINI_MODEL = 'gemini-flash-latest';
 
+// Groq for text-based estimation (much higher free quota)
+const GROQ_API_KEY = process.env.EXPO_PUBLIC_GROQ_API_KEY ?? '';
+const GROQ_MODEL = 'llama-3.3-70b-versatile';
+const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
+
 // ---------- Gemini vision: photo → calorie estimate ----------
 
 const PHOTO_PROMPT = `You are a nutrition assistant. Analyze the food in this photo and estimate calories.
@@ -74,12 +79,45 @@ async function callGeminiVision(base64: string): Promise<FoodAnalysis | null> {
   return null;
 }
 
-// ---------- Gemini text: food name → calorie estimate ----------
+// ---------- Groq text: food name → calorie estimate (primary) ----------
 
 const NAME_PROMPT = (name: string) => `You are a nutrition assistant. Estimate the calories for this food: "${name}".
-Respond ONLY with valid JSON:
+Respond ONLY with valid JSON (no markdown, no commentary):
 {"mealName": "${name}", "totalCalories": 450, "components": [{"name": "Component", "calories": 200}]}
 Use typical portion sizes. Be positive — never mention dieting or judgment. Round calories to the nearest 10.`;
+
+async function callGroqText(name: string): Promise<FoodAnalysis | null> {
+  if (!GROQ_API_KEY) return null;
+  try {
+    const res = await fetch(GROQ_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${GROQ_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: GROQ_MODEL,
+        messages: [
+          { role: 'system', content: 'You are a nutrition assistant. Always respond with valid JSON only, no markdown.' },
+          { role: 'user', content: NAME_PROMPT(name) },
+        ],
+        temperature: 0.3,
+        max_completion_tokens: 256,
+        response_format: { type: 'json_object' },
+      }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const text: string | undefined = data?.choices?.[0]?.message?.content;
+    if (!text) return null;
+    const parsed = JSON.parse(text);
+    return normalizeAnalysis(parsed);
+  } catch {
+    return null;
+  }
+}
+
+// ---------- Gemini text: food name → calorie estimate (fallback) ----------
 
 async function callGeminiText(name: string): Promise<FoodAnalysis | null> {
   if (!GEMINI_API_KEY) return null;
@@ -273,10 +311,15 @@ export async function analyzeFoodPhoto(
  * Returns null if nothing matches.
  */
 export async function estimateFoodByName(name: string): Promise<FoodAnalysis | null> {
+  // 1. Try local DB first (instant, no API cost)
   const local = estimateFromLocalDB(name);
   if (local) {
     await new Promise((resolve) => setTimeout(resolve, 200));
     return local;
   }
+  // 2. Try Groq (fast, high quota)
+  const groqResult = await callGroqText(name);
+  if (groqResult) return groqResult;
+  // 3. Fallback to Gemini
   return callGeminiText(name);
 }
