@@ -267,7 +267,7 @@ For schema changes after initial setup:
 ```typescript
 // src/services/miko.ts, src/services/calorieAnalyzer.ts
 const GROQ_API_KEY = process.env.EXPO_PUBLIC_GROQ_API_KEY ?? '';
-const GROQ_MODEL = 'mixtral-8x7b-32768';
+const GROQ_MODEL = 'llama3-8b-instant';
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 ```
 
@@ -551,7 +551,7 @@ eas secret:create --name EXPO_PUBLIC_GROQ_API_KEY --value "gsk_..."
 
 | Error | Cause | Solution |
 |-------|-------|----------|
-| `404 model_not_found` | Model name wrong or decommissioned | Use `mixtral-8x7b-32768` (stable) |
+| `404 model_not_found` | Model name wrong or decommissioned | Use `llama3-8b-instant` (stable) |
 | `400 model_decommissioned` | Model retired | Check [Groq docs](https://console.groq.com/docs/deprecations) |
 | `401 unauthorized` | Invalid API key | Verify key in Groq dashboard |
 
