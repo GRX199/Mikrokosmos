@@ -87,7 +87,10 @@ Respond ONLY with valid JSON (no markdown, no commentary):
 Use typical portion sizes. Be positive — never mention dieting or judgment. Round calories to the nearest 10.`;
 
 async function callGroqText(name: string): Promise<FoodAnalysis | null> {
-  if (!GROQ_API_KEY) return null;
+  if (!GROQ_API_KEY) {
+    console.warn('[CalorieAnalyzer] No Groq API key');
+    return null;
+  }
   try {
     const res = await fetch(GROQ_URL, {
       method: 'POST',
@@ -106,13 +109,18 @@ async function callGroqText(name: string): Promise<FoodAnalysis | null> {
         response_format: { type: 'json_object' },
       }),
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.error('[CalorieAnalyzer] Groq failed:', res.status, errorText);
+      return null;
+    }
     const data = await res.json();
     const text: string | undefined = data?.choices?.[0]?.message?.content;
     if (!text) return null;
     const parsed = JSON.parse(text);
     return normalizeAnalysis(parsed);
-  } catch {
+  } catch (err) {
+    console.error('[CalorieAnalyzer] Groq error:', err);
     return null;
   }
 }
