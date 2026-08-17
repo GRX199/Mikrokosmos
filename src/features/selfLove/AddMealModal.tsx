@@ -101,7 +101,7 @@ export function AddMealModal({
         setName(result.mealName);
         setCalories(String(result.totalCalories));
       } else {
-        setNameHint('Add EXPO_PUBLIC_GEMINI_API_KEY to enable photo analysis.');
+        setNameHint('Photo analysis unavailable right now. Try typing the food name instead! 🍽️');
       }
     } finally {
       setAnalyzing(false);
