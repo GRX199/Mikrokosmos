@@ -34,7 +34,6 @@ export function CosmicTabBar({ state, descriptors, navigation }: BottomTabBarPro
         styles.wrap,
         { bottom: Math.max(insets.bottom, 8) + (Platform.OS === 'web' ? 8 : 0) },
       ]}
-      pointerEvents="box-none"
     >
       <View
         style={[
@@ -106,6 +105,7 @@ const styles = StyleSheet.create({
     right: 0,
     alignItems: 'center',
     paddingHorizontal: 16,
+    pointerEvents: 'box-none',
   },
   bar: {
     flexDirection: 'row',
@@ -115,10 +115,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     paddingVertical: 8,
     paddingHorizontal: 8,
-    shadowColor: '#8D6CCF',
-    shadowOpacity: 0.14,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 8 },
+    boxShadow: '0px 8px 18px rgba(141,108,207,0.14)',
     elevation: 6,
   },
   tab: {

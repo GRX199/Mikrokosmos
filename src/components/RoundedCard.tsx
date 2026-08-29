@@ -55,10 +55,7 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.lg,
     borderWidth: 1,
     padding: 18,
-    shadowColor: '#8D6CCF',
-    shadowOpacity: 0.07,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 6 },
+    boxShadow: '0px 6px 14px rgba(141,108,207,0.07)',
     elevation: 2,
   },
 });

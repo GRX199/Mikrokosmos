@@ -157,10 +157,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 10,
-    shadowColor: '#8D6CCF',
-    shadowOpacity: 0.18,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 8 },
+    boxShadow: '0px 8px 18px rgba(141,108,207,0.18)',
     elevation: 3,
   },
   logoEmoji: {

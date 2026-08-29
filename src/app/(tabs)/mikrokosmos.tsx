@@ -648,10 +648,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
     gap: 6,
-    shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 8 },
+    boxShadow: '0px 8px 20px rgba(0,0,0,0.15)',
     elevation: 6,
   },
   reactionButton: {
