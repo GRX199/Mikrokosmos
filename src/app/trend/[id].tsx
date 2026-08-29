@@ -23,6 +23,7 @@ import { RADIUS, trendStatusMeta, TREND_STATUSES, useAppTheme } from '@/core/the
 import type { Profile, Trend, TrendStatus, TrendTask } from '@/models';
 import { logActivity } from '@/repositories/activities';
 import { sendMikoMessage } from '@/repositories/chat';
+import { createMemory } from '@/repositories/memories';
 import { fetchProfiles } from '@/repositories/profiles';
 import {
   addTask,
@@ -113,9 +114,19 @@ export default function TrendDetailScreen() {
 
   async function handleSaveMemory() {
     if (!profile || !trend) return;
-    // Phase 2 Memories seam: store a caption-only memory placeholder for now.
-    await logActivity(profile.id, 'memory', `💌 Memory saved: "${trend.title}" — done together.`);
+    // Phase 2 Memories: a real scrapbook entry linked to this trend.
+    await createMemory(profile.id, {
+      title: trend.title,
+      caption: trend.description?.trim() || 'Done together ✨',
+      trend_id: trend.id,
+    });
+    await logActivity(
+      profile.id,
+      'memory',
+      `${profile.display_name} saved "${trend.title}" to Memories 💌`
+    );
     setCelebrate(false);
+    router.push('/memories');
   }
 
   async function handleAddTask() {

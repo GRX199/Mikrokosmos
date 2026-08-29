@@ -106,6 +106,16 @@ export interface TrendTask {
   completed_by?: string | null;
 }
 
+export interface Memory {
+  id: string;
+  title: string;
+  caption: string;
+  image_url?: string | null;
+  trend_id?: string | null;
+  created_by?: string | null;
+  created_at: string;
+}
+
 export type ActivityType =
   | 'checkin'
   | 'meal'

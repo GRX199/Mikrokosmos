@@ -79,6 +79,8 @@ function AppStack({ ready }: { ready: boolean }) {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="friend/[id]" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="trend/[id]" options={{ animation: 'slide_from_bottom' }} />
+        <Stack.Screen name="memories" options={{ animation: 'slide_from_bottom' }} />
+        <Stack.Screen name="achievements" options={{ animation: 'slide_from_bottom' }} />
       </Stack>
     </NavigationThemeProvider>
   );

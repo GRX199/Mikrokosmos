@@ -4,6 +4,7 @@ import type {
   DailyCheckin,
   Goals,
   Meal,
+  Memory,
   PrivacySettings,
   Profile,
   Trend,
@@ -132,6 +133,18 @@ export const mockTrendTasks: TrendTask[] = [
 ];
 
 const hoursAgo = (h: number) => new Date(Date.now() - h * 3600_000).toISOString();
+
+export const mockMemories: Memory[] = [
+  {
+    id: 'mem1',
+    title: 'Matching Photo Dump',
+    caption: 'Same pose, three cities, one grid — we actually pulled it off!',
+    image_url: null,
+    trend_id: 't3',
+    created_by: MOCK_PROFILES[0].id,
+    created_at: hoursAgo(30),
+  },
+];
 
 export const mockMessages: ChatMessage[] = [
   {

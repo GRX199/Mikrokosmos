@@ -144,6 +144,18 @@ create table if not exists public.privacy_settings (
   updated_at timestamptz not null default now()
 );
 
+-- Shared scrapbook moments (Phase 2: memories of things done together).
+create table if not exists public.memories (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  caption text not null default '',
+  image_url text,
+  trend_id uuid references public.trends (id) on delete set null,
+  created_by uuid references public.profiles (id) on delete set null,
+  created_at timestamptz not null default now()
+);
+create index if not exists memories_created_at_idx on public.memories (created_at desc);
+
 -- ---------- Indexes ----------
 create index if not exists daily_checkins_date_idx on public.daily_checkins (date);
 create index if not exists meals_user_date_idx on public.meals (user_id, date);
@@ -168,7 +180,8 @@ grant select, insert, update, delete on
   public.trend_participants,
   public.trend_tasks,
   public.activities,
-  public.privacy_settings
+  public.privacy_settings,
+  public.memories
 to authenticated;
 alter default privileges in schema public
   grant select, insert, update, delete on tables to authenticated;
@@ -327,6 +340,20 @@ create policy "members manage own privacy settings" on public.privacy_settings
   for all to authenticated
   using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
+-- Memories: shared scrapbook — everyone reads; author edits/deletes own.
+drop policy if exists "members read memories" on public.memories;
+create policy "members read memories" on public.memories
+  for select to authenticated using (true);
+drop policy if exists "members insert memories" on public.memories;
+create policy "members insert memories" on public.memories
+  for insert to authenticated with check (auth.uid() = created_by);
+drop policy if exists "members update own memories" on public.memories;
+create policy "members update own memories" on public.memories
+  for update to authenticated using (auth.uid() = created_by) with check (auth.uid() = created_by);
+drop policy if exists "members delete own memories" on public.memories;
+create policy "members delete own memories" on public.memories
+  for delete to authenticated using (auth.uid() = created_by);
+
 -- ---------- Realtime ----------
 -- Chat + shared checklists sync live.
 -- Idempotent adds (re-running this file would otherwise error).
@@ -352,6 +379,10 @@ begin
     select 1 from pg_publication_tables
     where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'activities'
   ) then alter publication supabase_realtime add table public.activities; end if;
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'memories'
+  ) then alter publication supabase_realtime add table public.memories; end if;
 end $$;
 
 -- ---------- Storage ----------

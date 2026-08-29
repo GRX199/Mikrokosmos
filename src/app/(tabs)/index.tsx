@@ -13,7 +13,11 @@ import { SectionTitle } from '@/components/SectionTitle';
 import { moodMeta, RADIUS, useAppTheme } from '@/core/theme';
 import { friendlyDate, greetingFor, dayPhase, relativeTime, shortTime } from '@/core/utils/date';
 import type { Activity, Mood, Profile } from '@/models';
-import { createCheckin, fetchCheckinsForDate } from '@/repositories/checkins';
+import { createCheckin, fetchCheckinsForDate, fetchUserCheckins } from '@/repositories/checkins';
+import { logActivity } from '@/repositories/activities';
+import { sendMikoMessage } from '@/repositories/chat';
+import { computeStreak, isStreakMilestone } from '@/services/streak';
+import { mikoLine } from '@/services/miko';
 import { useAuth } from '@/features/auth/SessionProvider';
 import {
   celebrateCheckin,
@@ -78,6 +82,19 @@ export default function HomeScreen() {
     const todays = await fetchCheckinsForDate(todayKey()).catch(() => []);
     const allIn = data!.profiles.every((p) => todays.some((c) => c.user_id === p.id));
     await celebrateCheckin(profile, allIn);
+
+    // Streak milestone → gentle achievement badge activity (Phase 2).
+    const myCheckins = await fetchUserCheckins(profile.id).catch(() => []);
+    const newStreak = computeStreak(myCheckins);
+    if (isStreakMilestone(newStreak)) {
+      await logActivity(
+        profile.id,
+        'achievement',
+        `${profile.display_name} reached a ${newStreak}-day streak 🔥 Keep glowing!`
+      );
+      await sendMikoMessage(mikoLine('new_streak', profile));
+    }
+
     setCheckinOpen(false);
     await refresh();
   }
@@ -176,8 +193,14 @@ export default function HomeScreen() {
                     case 'miko':
                       router.push('/(tabs)/mikrokosmos');
                       break;
+                    case 'memory':
+                      router.push('/memories');
+                      break;
+                    case 'achievement':
+                      router.push('/achievements');
+                      break;
                     default:
-                      // memory, achievement, streak — no specific page
+                      // streak — no specific page
                       break;
                   }
                 }}

@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
@@ -34,6 +35,7 @@ import { useAuth } from '@/features/auth/SessionProvider';
 export default function MeScreen() {
   const { profile, refreshProfile, signOut, isMock } = useAuth();
   const { theme, palette } = useAppTheme();
+  const router = useRouter();
 
   const [stats, setStats] = useState({ streak: 0, checkins: 0, meals: 0, trendsDone: 0 });
   const [privacy, setPrivacy] = useState<PrivacySettings | null>(null);
@@ -140,6 +142,18 @@ export default function MeScreen() {
             label="Privacy"
             hint="Control what friends can see"
             onPress={() => setPrivacyOpen(true)}
+          />
+          <MenuItem
+            icon="heart-circle-outline"
+            label="Memories"
+            hint="Your shared scrapbook"
+            onPress={() => router.push('/memories')}
+          />
+          <MenuItem
+            icon="ribbon-outline"
+            label="Achievements"
+            hint="Gentle milestone badges"
+            onPress={() => router.push('/achievements')}
           />
           <MenuItem
             icon="key-outline"
