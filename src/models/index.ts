@@ -145,6 +145,36 @@ export interface PrivacySettings {
   meals_visibility: Visibility;
 }
 
+// ---------- Body metrics (smart calorie targets, Phase 2) ----------
+
+export type Sex = 'female' | 'male';
+export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'active' | 'very_active';
+export type WeightGoal = 'maintain' | 'lose_025' | 'lose_05' | 'lose_075';
+
+export interface BodyMetrics {
+  user_id: string;
+  height_cm?: number | null;
+  weight_kg?: number | null;
+  age?: number | null;
+  sex: Sex;
+  activity_level: ActivityLevel;
+  goal: WeightGoal;
+  updated_at?: string;
+}
+
+/** Derived, client-side: BMI, BMR, TDEE and the gentle calorie target. */
+export interface BodyInsights {
+  bmi: number | null;
+  bmiLabel: string;
+  bmiEmoji: string;
+  bmr: number | null;
+  tdee: number | null;
+  targetCalories: number | null;
+  weeklyRateKg: number; // 0 for maintain
+  isHealthyDeficit: boolean;
+  estimatedDays: number | null; // days to reach a healthy BMI range at current rate
+}
+
 /** Everything the Home screen needs about one friend, for today. */
 export interface FriendDayStatus {
   profile: Profile;

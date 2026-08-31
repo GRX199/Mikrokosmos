@@ -22,7 +22,7 @@ import { SectionTitle } from '@/components/SectionTitle';
 import { SoftInput } from '@/components/SoftInput';
 import { mealMeta, moodMeta, performanceTier, useAppTheme } from '@/core/theme';
 import { formatNumber, shortTime, todayKey } from '@/core/utils/date';
-import type { DailyCheckin, Goals, Meal, Profile } from '@/models';
+import type { BodyMetrics, DailyCheckin, Goals, Meal, Profile } from '@/models';
 import { fetchCheckin } from '@/repositories/checkins';
 import {
   createMeal,
@@ -35,11 +35,14 @@ import { fetchGoals, fetchProfiles } from '@/repositories/profiles';
 import { logActivity } from '@/repositories/activities';
 import { uploadImage, resolveMediaUrl } from '@/repositories/storage';
 import { fetchWater, setWater, setSteps, fetchSteps, fetchDayStats } from '@/repositories/waterSteps';
+import { fetchBodyMetrics, upsertBodyMetrics } from '@/repositories/bodyMetrics';
 import { sendMikoMessage } from '@/repositories/chat';
 import { mikoLine } from '@/services/miko';
 import { computePerformance } from '@/services/performance';
+import { computeBodyInsights } from '@/services/bodyInsights';
 import { useAuth } from '@/features/auth/SessionProvider';
 import { AddMealModal } from '@/features/selfLove/AddMealModal';
+import { BodyMetricsModal } from '@/features/selfLove/BodyMetricsModal';
 
 /** Self Love — health & diet space with gentle wording (spec sections 11-18). */
 export default function SelfLoveScreen() {
@@ -61,12 +64,14 @@ export default function SelfLoveScreen() {
   const [editingMeal, setEditingMeal] = useState<Meal | null>(null);
   const [stepDraft, setStepDraft] = useState('');
   const [resolvedImages, setResolvedImages] = useState<Record<string, string>>({});
+  const [bodyMetrics, setBodyMetrics] = useState<BodyMetrics | null>(null);
+  const [bodyModalOpen, setBodyModalOpen] = useState(false);
 
   const load = useCallback(async () => {
     if (!profile) return;
     setError(null);
     try {
-      const [mealList, glasses, stepCount, goalList, todayCheckin, allProfiles] =
+      const [mealList, glasses, stepCount, goalList, todayCheckin, allProfiles, myBody] =
         await Promise.all([
           fetchMealsForDate(profile.id, date),
           fetchWater(profile.id, date),
@@ -74,6 +79,7 @@ export default function SelfLoveScreen() {
           fetchGoals(profile.id),
           fetchCheckin(profile.id, date),
           fetchProfiles(),
+          fetchBodyMetrics(profile.id).catch(() => null),
         ]);
       setMeals(mealList);
       setWaterCount(glasses);
@@ -82,6 +88,7 @@ export default function SelfLoveScreen() {
       setGoalsState(goalList);
       setCheckin(todayCheckin);
       setProfiles(allProfiles);
+      setBodyMetrics(myBody);
 
       // Group progress: average of each friend's performance (no ranking).
       const dayStats = await fetchDayStats(date);
@@ -148,6 +155,9 @@ export default function SelfLoveScreen() {
   const groupAverage = groupScores.length
     ? Math.round(groupScores.reduce((a, b) => a + b, 0) / groupScores.length)
     : 0;
+  // Smart target: from body metrics when set, else the static goal.
+  const bodyInsights = bodyMetrics ? computeBodyInsights(bodyMetrics) : null;
+  const smartGoal = bodyInsights?.targetCalories ?? goals.calorie_goal;
 
   // ---------- Actions ----------
 
@@ -196,6 +206,12 @@ export default function SelfLoveScreen() {
     await load();
   }
 
+  async function handleSaveBody(patch: Partial<Omit<BodyMetrics, 'user_id'>>) {
+    if (!profile) return;
+    const saved = await upsertBodyMetrics(profile.id, patch);
+    setBodyMetrics(saved);
+  }
+
   function confirmDeleteMeal(meal: Meal) {
     Alert.alert('Remove this meal?', meal.meal_name, [
       { text: 'Keep it', style: 'cancel' },
@@ -238,10 +254,10 @@ export default function SelfLoveScreen() {
           <View style={styles.ringRow}>
             <View style={styles.ringItem}>
               <ProgressRing
-                progress={goals.calorie_goal ? calories / goals.calorie_goal : 0}
+                progress={smartGoal ? calories / smartGoal : 0}
                 size={78}
                 label={`${formatNumber(calories)}`}
-                sublabel={`of ${formatNumber(goals.calorie_goal)}`}
+                sublabel={`of ${formatNumber(smartGoal)}`}
               />
               <Text style={[styles.ringLabel, { color: palette.textSecondary }]}>Calories</Text>
             </View>
@@ -273,6 +289,63 @@ export default function SelfLoveScreen() {
             </Text>
           </View>
         </RoundedCard>
+
+        {/* Smart body insights (private) */}
+        {bodyInsights && bodyInsights.targetCalories ? (
+          <Pressable onPress={() => setBodyModalOpen(true)}>
+            <RoundedCard style={styles.bodyCard} tinted>
+              <View style={styles.bodyHeader}>
+                <Text style={[styles.bodyTitle, { color: palette.text }]}>My Body 🌸</Text>
+                {bodyInsights.estimatedDays ? (
+                  <View style={[styles.bodyBadge, { backgroundColor: theme.light }]}>
+                    <Text style={[styles.bodyBadgeText, { color: theme.accent }]}>
+                      ~{bodyInsights.estimatedDays} days to healthy range
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+              <View style={styles.bodyStatsRow}>
+                <View style={styles.bodyStat}>
+                  <Text style={[styles.bodyStatValue, { color: theme.accent }]}>
+                    {formatNumber(bodyInsights.targetCalories)}
+                  </Text>
+                  <Text style={[styles.bodyStatLabel, { color: palette.textSecondary }]}>
+                    kcal target
+                  </Text>
+                </View>
+                <View style={styles.bodyStat}>
+                  <Text style={[styles.bodyStatValue, { color: theme.accent }]}>
+                    {bodyInsights.bmi}
+                  </Text>
+                  <Text style={[styles.bodyStatLabel, { color: palette.textSecondary }]}>
+                    BMI {bodyInsights.bmiEmoji}
+                  </Text>
+                </View>
+                <View style={styles.bodyStat}>
+                  <Text style={[styles.bodyStatValue, { color: theme.accent }]}>
+                    {bodyInsights.weeklyRateKg > 0 ? `−${bodyInsights.weeklyRateKg}` : '🌱'}
+                  </Text>
+                  <Text style={[styles.bodyStatLabel, { color: palette.textSecondary }]}>
+                    {bodyInsights.weeklyRateKg > 0 ? 'kg / week' : 'maintaining'}
+                  </Text>
+                </View>
+              </View>
+              <Text style={[styles.bodyNote, { color: palette.textFaint }]}>
+                Tap to adjust your numbers — private, always 💗
+              </Text>
+            </RoundedCard>
+          </Pressable>
+        ) : (
+          <Pressable onPress={() => setBodyModalOpen(true)}>
+            <RoundedCard style={styles.bodyCard} tinted>
+              <Text style={[styles.bodyTitle, { color: palette.text }]}>Smart calorie target ✨</Text>
+              <Text style={[styles.bodyNote, { color: palette.textSecondary }]}>
+                Add your height, weight and goal — we'll compute a kind daily
+                target just for you (only you can see it).
+              </Text>
+            </RoundedCard>
+          </Pressable>
+        )}
 
         {/* Water tracker */}
         <SectionTitle title="💧 Water" />
@@ -409,7 +482,7 @@ export default function SelfLoveScreen() {
             <View style={[styles.diaryTotalRow, { backgroundColor: theme.light }]}>
               <Text style={[styles.diaryTotalLabel, { color: theme.accent }]}>Today's Total</Text>
               <Text style={[styles.diaryTotalValue, { color: theme.accent }]}>
-                {formatNumber(calories)} / {formatNumber(goals.calorie_goal)} kcal
+                {formatNumber(calories)} / {formatNumber(smartGoal)} kcal
               </Text>
             </View>
           </RoundedCard>
@@ -438,6 +511,13 @@ export default function SelfLoveScreen() {
 
         <View style={styles.bottomGap} />
       </ScrollView>
+
+      <BodyMetricsModal
+        visible={bodyModalOpen}
+        metrics={bodyMetrics}
+        onClose={() => setBodyModalOpen(false)}
+        onSave={handleSaveBody}
+      />
 
       <AddMealModal
         visible={mealModalOpen}
@@ -645,4 +725,14 @@ const styles = StyleSheet.create({
   bottomGap: {
     height: 130,
   },
+  bodyCard: { marginTop: 16, padding: 16 },
+  bodyHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
+  bodyTitle: { fontSize: 16, fontWeight: '800' },
+  bodyBadge: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
+  bodyBadgeText: { fontSize: 11, fontWeight: '700' },
+  bodyStatsRow: { flexDirection: 'row', gap: 8, marginBottom: 8 },
+  bodyStat: { flex: 1, alignItems: 'center', gap: 2 },
+  bodyStatValue: { fontSize: 20, fontWeight: '800' },
+  bodyStatLabel: { fontSize: 11 },
+  bodyNote: { fontSize: 11.5, fontStyle: 'italic' },
 });

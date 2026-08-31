@@ -1,5 +1,6 @@
 import type {
   Activity,
+  BodyMetrics,
   ChatMessage,
   DailyCheckin,
   Goals,
@@ -193,5 +194,17 @@ export const mockPrivacy: Record<string, PrivacySettings> = {
   [MOCK_PROFILES[2].id]: {
     user_id: MOCK_PROFILES[2].id,
     weight_visibility: 'only_me', calories_visibility: 'friends', meals_visibility: 'friends',
+  },
+};
+
+export const mockBodyMetrics: Record<string, BodyMetrics> = {
+  [MOCK_PROFILES[0].id]: {
+    user_id: MOCK_PROFILES[0].id,
+    height_cm: 158,
+    weight_kg: 54,
+    age: 22,
+    sex: 'female',
+    activity_level: 'light',
+    goal: 'lose_025',
   },
 };

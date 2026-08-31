@@ -16,8 +16,8 @@ import { ErrorState } from '@/components/ErrorState';
 import { LoadingView } from '@/components/LoadingView';
 import { RoundedCard } from '@/components/RoundedCard';
 import { Screen } from '@/components/Screen';
-import { RADIUS, moodMeta, useAppTheme } from '@/core/theme';
-import { monthYear, todayKey } from '@/core/utils/date';
+import { RADIUS, mealMeta, moodMeta, useAppTheme } from '@/core/theme';
+import { formatNumber, monthYear, shortTime, todayKey } from '@/core/utils/date';
 import type { Activity, Profile } from '@/models';
 import { fetchHistoryRange, type DayHistory } from '@/repositories/history';
 import { fetchProfiles } from '@/repositories/profiles';
@@ -243,49 +243,127 @@ export default function CalendarScreen() {
             subtitle="Nothing was logged this day — and that's okay."
           />
         ) : (
-          <RoundedCard style={styles.detailCard}>
+          <>
             {/* Trio snapshot */}
-            <View style={styles.trioRow}>
-              {profiles.map((p) => {
-                const checkin = selectedDay.checkins[p.id];
-                const meals = selectedDay.meals[p.id] ?? [];
-                const water = selectedDay.water[p.id] ?? 0;
-                const steps = selectedDay.steps[p.id] ?? 0;
-                const empty = !checkin && meals.length === 0 && water === 0 && steps === 0;
-                return (
-                  <View key={p.id} style={styles.trioCell}>
-                    <Avatar profile={p} size={34} />
-                    <Text style={[styles.trioName, { color: palette.text }]} numberOfLines={1}>
-                      {p.display_name}
-                    </Text>
-                    {empty ? (
-                      <Text style={[styles.trioEmpty, { color: palette.textFaint }]}>rest 🌙</Text>
-                    ) : (
-                      <Text style={[styles.trioMeta, { color: palette.textSecondary }]}>
-                        {checkin ? `${moodMeta(checkin.mood).emoji}` : ''}
-                        {meals.length > 0 ? ` 🍱${meals.length}` : ''}
-                        {water > 0 ? ` 💧${water}` : ''}
-                        {steps > 0 ? ` 👟${formatSteps(steps)}` : ''}
+            <RoundedCard style={styles.detailCard}>
+              <View style={styles.trioRow}>
+                {profiles.map((p) => {
+                  const checkin = selectedDay.checkins[p.id];
+                  const meals = selectedDay.meals[p.id] ?? [];
+                  const water = selectedDay.water[p.id] ?? 0;
+                  const steps = selectedDay.steps[p.id] ?? 0;
+                  const empty = !checkin && meals.length === 0 && water === 0 && steps === 0;
+                  return (
+                    <View key={p.id} style={styles.trioCell}>
+                      <Avatar profile={p} size={34} />
+                      <Text style={[styles.trioName, { color: palette.text }]} numberOfLines={1}>
+                        {p.display_name}
                       </Text>
-                    )}
+                      {empty ? (
+                        <Text style={[styles.trioEmpty, { color: palette.textFaint }]}>rest 🌙</Text>
+                      ) : (
+                        <Text style={[styles.trioMeta, { color: palette.textSecondary }]}>
+                          {checkin ? `${moodMeta(checkin.mood).emoji}` : ''}
+                          {meals.length > 0 ? ` 🍱${meals.length}` : ''}
+                          {water > 0 ? ` 💧${water}` : ''}
+                          {steps > 0 ? ` 👟${formatSteps(steps)}` : ''}
+                        </Text>
+                      )}
+                    </View>
+                  );
+                })}
+              </View>
+            </RoundedCard>
+
+            {/* Meal breakdown per person, with calories */}
+            {profiles.map((p) => {
+              const meals = selectedDay.meals[p.id] ?? [];
+              if (meals.length === 0) return null;
+              const totalKcal = meals.reduce((s, m) => s + (m.calories ?? 0), 0);
+              const analyzedCount = meals.filter((m) => m.calories != null).length;
+              return (
+                <View key={p.id} style={styles.personBlock}>
+                  <View style={styles.personHeader}>
+                    <Avatar profile={p} size={26} />
+                    <Text style={[styles.personName, { color: palette.text }]}>
+                      {p.emoji} {p.display_name}'s meals
+                    </Text>
+                    {analyzedCount > 0 ? (
+                      <View style={[styles.kcalBadge, { backgroundColor: theme.light }]}>
+                        <Text style={[styles.kcalBadgeText, { color: theme.accent }]}>
+                          {formatNumber(totalKcal)} kcal
+                        </Text>
+                      </View>
+                    ) : null}
                   </View>
-                );
-              })}
-            </View>
+                  <RoundedCard style={styles.mealListCard}>
+                    {meals.map((meal, idx) => (
+                      <View
+                        key={meal.id}
+                        style={[
+                          styles.mealRow,
+                          idx !== meals.length - 1 && {
+                            borderBottomWidth: 1,
+                            borderBottomColor: palette.border,
+                          },
+                        ]}
+                      >
+                        <Text style={styles.mealEmoji}>
+                          {mealMeta(meal.meal_type).emoji}
+                        </Text>
+                        <View style={styles.mealInfo}>
+                          <Text style={[styles.mealTitle, { color: palette.text }]} numberOfLines={1}>
+                            {meal.meal_name}
+                          </Text>
+                          <Text style={[styles.mealMeta, { color: palette.textFaint }]}>
+                            {mealMeta(meal.meal_type).label} · {shortTime(meal.meal_time)}
+                          </Text>
+                        </View>
+                        <Text
+                          style={[
+                            styles.mealKcal,
+                            {
+                              color: meal.calories != null ? theme.accent : palette.textFaint,
+                              fontWeight: meal.calories != null ? '800' : '400',
+                            },
+                          ]}
+                        >
+                          {meal.calories != null ? `${formatNumber(meal.calories)} kcal` : '—'}
+                        </Text>
+                      </View>
+                    ))}
+                    {totalKcal > 0 ? (
+                      <View style={[styles.mealTotalRow, { borderTopWidth: 1, borderTopColor: palette.border }]}>
+                        <Text style={[styles.mealTotalLabel, { color: palette.textSecondary }]}>
+                          Day total
+                        </Text>
+                        <Text style={[styles.mealTotalValue, { color: theme.accent }]}>
+                          {formatNumber(totalKcal)} kcal
+                        </Text>
+                      </View>
+                    ) : null}
+                  </RoundedCard>
+                </View>
+              );
+            })}
 
             {/* Activity feed for that day */}
             {selectedActivities.length > 0 ? (
-              <View style={[styles.feedWrap, { borderTopColor: palette.border }]}>
-                {selectedActivities.map((a, idx) => (
-                  <View key={a.id} style={styles.feedRow}>
-                    <Text style={styles.feedEmoji}>{ACTIVITY_ICONS[a.type] ?? '✨'}</Text>
-                    <Text style={[styles.feedText, { color: palette.text }]}>{a.text}</Text>
-                    {idx === 0 ? null : null}
-                  </View>
-                ))}
+              <View style={styles.personBlock}>
+                <Text style={[styles.personName, { color: palette.text, marginBottom: 8 }]}>
+                  ✨ Moments of the day
+                </Text>
+                <RoundedCard style={styles.detailCard}>
+                  {selectedActivities.map((a) => (
+                    <View key={a.id} style={styles.feedRow}>
+                      <Text style={styles.feedEmoji}>{ACTIVITY_ICONS[a.type] ?? '✨'}</Text>
+                      <Text style={[styles.feedText, { color: palette.text }]}>{a.text}</Text>
+                    </View>
+                  ))}
+                </RoundedCard>
               </View>
             ) : null}
-          </RoundedCard>
+          </>
         )}
 
         <View style={styles.bottomGap} />
@@ -361,6 +439,26 @@ const styles = StyleSheet.create({
   legendRest: { fontSize: 11, fontStyle: 'italic' },
   detailTitle: { fontSize: 16, fontWeight: '800', marginTop: 20, marginBottom: 10 },
   detailCard: { padding: 14 },
+  personBlock: { marginBottom: 18 },
+  personHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+  personName: { flex: 1, fontSize: 14, fontWeight: '800' },
+  kcalBadge: { borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 4 },
+  kcalBadgeText: { fontSize: 12, fontWeight: '800' },
+  mealListCard: { padding: 6 },
+  mealRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, paddingHorizontal: 8 },
+  mealEmoji: { fontSize: 16 },
+  mealInfo: { flex: 1 },
+  mealTitle: { fontSize: 13.5, fontWeight: '700' },
+  mealMeta: { fontSize: 11.5, marginTop: 1 },
+  mealKcal: { fontSize: 12.5 },
+  mealTotalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingTop: 10,
+    marginTop: 2,
+  },
+  mealTotalLabel: { fontSize: 12.5, fontWeight: '700' },
+  mealTotalValue: { fontSize: 13, fontWeight: '800' },
   trioRow: { flexDirection: 'row', gap: 8 },
   trioCell: { flex: 1, alignItems: 'center', gap: 4 },
   trioName: { fontSize: 11.5, fontWeight: '700' },
