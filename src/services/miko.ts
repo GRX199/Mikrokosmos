@@ -177,51 +177,71 @@ export async function askMiko(
 
 // ---------- Groq (OpenAI-compatible) ----------
 
+// Shared fetch plumbing: hard timeout so a hung provider can never freeze Miko.
+const REQUEST_TIMEOUT_MS = 20_000;
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+async function fetchWithTimeout(
+  url: string,
+  init: RequestInit,
+  timeoutMs = REQUEST_TIMEOUT_MS
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function isRetryable(status: number): boolean {
+  return status === 429 || status === 408 || (status >= 500 && status <= 599);
+}
+
 async function askGroq(
   message: string,
   senderName: string,
   convo: string
 ): Promise<string | null> {
-  try {
-    const res = await fetch(GROQ_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${GROQ_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: GROQ_MODEL,
-        messages: [
-          { role: 'system', content: MIKO_SYSTEM },
-          { role: 'user', content: `Recent chat:\n${convo}\n\n${senderName} just said: "${message}"\n\nReply as Miko:` },
-        ],
-        temperature: 0.8,
-        max_completion_tokens: 256,
-      }),
-    });
-
-    if (res.status === 429) {
-      console.warn('[Miko] Groq rate limited');
-      return null;
+  const call = async (): Promise<{ text: string | null; retryable: boolean }> => {
+    try {
+      const res = await fetchWithTimeout(GROQ_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${GROQ_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: GROQ_MODEL,
+          messages: [
+            { role: 'system', content: MIKO_SYSTEM },
+            { role: 'user', content: `Recent chat:\n${convo}\n\n${senderName} just said: "${message}"\n\nReply as Miko:` },
+          ],
+          temperature: 0.8,
+          max_completion_tokens: 512,
+        }),
+      });
+      if (!res.ok) {
+        if (isRetryable(res.status)) return { text: null, retryable: true };
+        console.error('[Miko] Groq rejected:', res.status, await res.text().catch(() => ''));
+        return { text: null, retryable: false };
+      }
+      const data = await res.json();
+      const text: string | undefined = data?.choices?.[0]?.message?.content;
+      return { text: text?.trim() ? text.trim().slice(0, 600) : null, retryable: false };
+    } catch (err) {
+      console.warn('[Miko] Groq network error:', err instanceof Error ? err.message : err);
+      return { text: null, retryable: true };
     }
+  };
 
-    if (!res.ok) {
-      const errorText = await res.text();
-      console.error('[Miko] Groq failed:', res.status, errorText);
-      return null;
-    }
-
-    const data = await res.json();
-    const text: string | undefined = data?.choices?.[0]?.message?.content;
-    if (text?.trim()) {
-      console.log('[Miko] Groq reply:', text.trim());
-      return text.trim();
-    }
-    return null;
-  } catch (err) {
-    console.error('[Miko] Groq error:', err);
-    return null;
+  let result = await call();
+  if (!result.text && result.retryable) {
+    await sleep(1200);
+    result = await call();
   }
+  return result.text;
 }
 
 // ---------- Gemini (fallback) ----------
@@ -241,7 +261,7 @@ async function askGemini(
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
-      const res = await fetch(url, {
+      const res = await fetchWithTimeout(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -265,15 +285,16 @@ async function askGemini(
         return null;
       }
 
-      if (res.status === 503 && attempt === 0) {
-        await new Promise(r => setTimeout(r, 1000));
+      if (isRetryable(res.status) && attempt === 0) {
+        await sleep(1200);
         continue;
       }
 
       if (!res.ok) return null;
       const data = await res.json();
       const text: string | undefined = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-      return text?.trim() ?? null;
+      const clean = text?.trim();
+      return clean ? clean.slice(0, 600) : null;
     } catch {
       if (attempt === 0) continue;
       return null;

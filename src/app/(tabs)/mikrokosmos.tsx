@@ -46,6 +46,9 @@ export default function ChatScreen() {
   const listRef = useRef<FlatList<ChatMessage>>(null);
   const [isFocused, setIsFocused] = useState(true);
   const isFocusedRef = useRef(true);
+  // Is the user reading near the bottom? If she scrolled up through
+  // history, new messages must NOT yank her down.
+  const nearBottomRef = useRef(true);
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [reactions, setReactions] = useState<Record<string, MessageReaction[]>>({});
@@ -94,6 +97,7 @@ export default function ChatScreen() {
     useCallback(() => {
       setIsFocused(true);
       isFocusedRef.current = true;
+      nearBottomRef.current = true; // reopening the chat = show the newest
       clearUnread();
       load();
       return () => {
@@ -122,12 +126,32 @@ export default function ChatScreen() {
     return unsubscribe;
   }, [loadReactions]);
 
+  // Scroll to the newest message. Keyed by the LAST message id (not length!)
+  // so re-fetches that keep the same count — e.g. returning to the tab after
+  // a reload — still scroll to the bottom. The double rAF waits for layout;
+  // a lone timeout often loses the race on web. Skipped when she's reading
+  // history up top (nearBottomRef), except for her own sends which always land.
+  const lastMessageId = messages.length ? messages[messages.length - 1].id : null;
   useEffect(() => {
-    // Scroll to bottom on initial load and when new messages arrive
-    if (!loading && messages.length > 0) {
-      setTimeout(() => listRef.current?.scrollToEnd({ animated: false }), 100);
+    if (loading || !lastMessageId) return;
+    if (!nearBottomRef.current) return;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        listRef.current?.scrollToEnd({ animated: false });
+      });
+    });
+  }, [loading, lastMessageId]);
+
+  // Also scroll when the tab regains focus (the list may have been hidden
+  // while inactive, which cancels scrolls on web). Returning to the chat
+  // always means: show the newest first.
+  useEffect(() => {
+    if (isFocused && messages.length > 0) {
+      requestAnimationFrame(() => {
+        listRef.current?.scrollToEnd({ animated: false });
+      });
     }
-  }, [loading, messages.length]);
+  }, [isFocused]);
 
   const replyPreview = useMemo(() => {
     if (!replyTo) return null;
@@ -153,6 +177,7 @@ export default function ChatScreen() {
               (a, b) => a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id)
             )
       );
+      nearBottomRef.current = true; // her own send always follows to the bottom
       if (!isSupabaseRealtime()) await load(); // mock mode: refresh manually
       // Miko replies to messages that mention her (only on the sender's device,
       // so the bot never gets duplicated across the 3 friends).
@@ -203,8 +228,11 @@ export default function ChatScreen() {
     await loadReactions([target]);
   }
 
+  const [mikoTyping, setMikoTyping] = useState(false);
+
   async function maybeAskMiko(text: string, sender: Profile) {
     if (!/\bmiko\b/i.test(text)) return;
+    setMikoTyping(true);
     try {
       const reply = await askMiko(
         text,
@@ -216,10 +244,23 @@ export default function ChatScreen() {
       );
       // Use quota message if quota exceeded, otherwise use reply or fallback
       const mikoReply = reply ?? (isQuotaExceeded() ? getQuotaExceededMessage() : mikoFallbackReply());
-      await sendMikoMessage(mikoReply);
-      if (!isSupabaseRealtime()) await load();
+      const sent = await sendMikoMessage(mikoReply);
+      if (sent) {
+        // Optimistic append — same guarantee as regular sends.
+        setMessages((prev) =>
+          prev.some((m) => m.id === sent.id)
+            ? prev
+            : [...prev, sent].sort(
+                (a, b) => a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id)
+              )
+        );
+      } else if (!isSupabaseRealtime()) {
+        await load();
+      }
     } catch {
       // Miko stays silent rather than breaking the chat.
+    } finally {
+      setMikoTyping(false);
     }
   }
 
@@ -254,6 +295,21 @@ export default function ChatScreen() {
           data={messages}
           keyExtractor={(item) => item.id}
           contentContainerStyle={[styles.list, { paddingBottom: 130 }]}
+          onScroll={(e) => {
+            const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
+            const distanceFromBottom =
+              contentSize.height - layoutMeasurement.height - contentOffset.y;
+            // "Near bottom" with a little tolerance (60px) for imprecision.
+            nearBottomRef.current = distanceFromBottom < 60;
+          }}
+          scrollEventThrottle={16}
+          onContentSizeChange={() => {
+            // After any content growth (new message, image load) pin to the
+            // newest message — but only while she's reading near the bottom.
+            if (isFocusedRef.current && nearBottomRef.current) {
+              listRef.current?.scrollToEnd({ animated: false });
+            }
+          }}
           renderItem={({ item }) => (
             <MessageBubble
               message={item}
@@ -268,6 +324,20 @@ export default function ChatScreen() {
               onReply={() => setReplyTo(item)}
             />
           )}
+          ListFooterComponent={
+            mikoTyping ? (
+              <View style={styles.mikoRow}>
+                <View style={[styles.mikoBubble, { backgroundColor: theme.light, borderColor: theme.primary }]}>
+                  <Text style={[styles.mikoName, { color: theme.accent }]}>
+                    {MIKO.emoji} Miko
+                  </Text>
+                  <Text style={[styles.mikoTypingText, { color: palette.textSecondary }]}>
+                    thinking…
+                  </Text>
+                </View>
+              </View>
+            ) : null
+          }
         />
 
         {/* Reply preview */}
@@ -584,6 +654,11 @@ const styles = StyleSheet.create({
   mikoText: {
     fontSize: 13.5,
     lineHeight: 19,
+    textAlign: 'center',
+  },
+  mikoTypingText: {
+    fontSize: 12.5,
+    fontStyle: 'italic',
     textAlign: 'center',
   },
   reactionRow: {

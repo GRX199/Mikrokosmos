@@ -70,26 +70,34 @@ export async function sendMessage(senderId: string, input: SendMessageInput): Pr
  * Miko speaks with sender_id = null + is_bot = true.
  * With Supabase, the RLS insert policy allows user_id IS NULL rows for
  * authenticated members, so the triggering member's token is used.
+ * Returns the message so callers can append it optimistically.
  */
-export async function sendMikoMessage(text: string): Promise<void> {
+export async function sendMikoMessage(text: string): Promise<ChatMessage | null> {
   if (!isSupabaseConfigured) {
-    mockMessages.push({
+    const msg: ChatMessage = {
       id: nextMockId(),
       sender_id: null,
       message: text,
       message_type: 'text',
       is_bot: true,
       created_at: new Date().toISOString(),
-    });
+    };
+    mockMessages.push(msg);
     mockListeners.forEach((l) => l());
-    return;
+    return msg;
   }
-  await getSupabase().from('messages').insert({
-    sender_id: null,
-    message: text,
-    message_type: 'text',
-    is_bot: true,
-  });
+  const { data, error } = await getSupabase()
+    .from('messages')
+    .insert({
+      sender_id: null,
+      message: text,
+      message_type: 'text',
+      is_bot: true,
+    })
+    .select()
+    .single();
+  if (error) throw new Error(error.message);
+  return (data as ChatMessage) ?? null;
 }
 
 export async function fetchReactions(messageIds: string[]): Promise<MessageReaction[]> {
