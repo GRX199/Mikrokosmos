@@ -34,6 +34,12 @@ export interface DailyCheckin {
   created_at?: string;
 }
 
+/** One food item inside an AI calorie estimate. */
+export interface MealComponent {
+  name: string;
+  calories: number;
+}
+
 export interface Meal {
   id: string;
   user_id: string;
@@ -41,6 +47,7 @@ export interface Meal {
   meal_type: MealType;
   meal_name: string;
   calories?: number | null;
+  components?: MealComponent[] | null;
   image_url?: string | null;
   notes?: string | null;
   meal_time: string; // HH:mm

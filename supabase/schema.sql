@@ -36,6 +36,7 @@ create table if not exists public.meals (
   meal_type text not null check (meal_type in ('breakfast', 'lunch', 'dinner', 'snack')),
   meal_name text not null,
   calories integer,
+  components jsonb,
   image_url text,
   notes text,
   meal_time time not null default '12:00',

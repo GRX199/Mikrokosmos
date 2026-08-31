@@ -16,7 +16,7 @@ import { RoundedCard } from '@/components/RoundedCard';
 import { SoftInput } from '@/components/SoftInput';
 import { MEAL_TYPES, RADIUS, useAppTheme } from '@/core/theme';
 import { nowTime } from '@/core/utils/date';
-import type { Meal, MealType } from '@/models';
+import type { Meal, MealComponent, MealType } from '@/models';
 import type { MealInput } from '@/repositories/meals';
 import { analyzeFoodPhoto, estimateFoodByName, type FoodAnalysis } from '@/services/calorieAnalyzer';
 
@@ -137,11 +137,19 @@ export function AddMealModal({
     if (!name.trim()) return;
     setSaving(true);
     try {
+      // Persist the component breakdown from the photo/name analysis so
+      // history + Recent Activity can show what's inside the meal, not
+      // just the total. Only when the numbers still match the analysis.
+      const keepComponents =
+        analysis && calories && Number(calories) === analysis.totalCalories
+          ? analysis.components
+          : null;
       await onSave(
         {
           meal_type: mealType,
           meal_name: name.trim(),
           calories: calories ? Math.max(0, Number(calories) || 0) : null,
+          components: keepComponents?.length ? keepComponents : null,
           notes: notes.trim() || null,
           meal_time: time,
         },

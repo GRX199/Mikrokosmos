@@ -128,29 +128,37 @@ export default function ChatScreen() {
 
   // Scroll to the newest message. Keyed by the LAST message id (not length!)
   // so re-fetches that keep the same count — e.g. returning to the tab after
-  // a reload — still scroll to the bottom. The double rAF waits for layout;
-  // a lone timeout often loses the race on web. Skipped when she's reading
-  // history up top (nearBottomRef), except for her own sends which always land.
+  // a reload — still scroll to the bottom. NOTE: scrollToEnd() is a silent
+  // no-op on react-native-web in several layout states, so we jump to a huge
+  // offset instead — the browser clamps it to the real bottom.
   const lastMessageId = messages.length ? messages[messages.length - 1].id : null;
   useEffect(() => {
     if (loading || !lastMessageId) return;
     if (!nearBottomRef.current) return;
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        listRef.current?.scrollToEnd({ animated: false });
+        listRef.current?.scrollToOffset({ offset: 1e9, animated: false });
       });
     });
   }, [loading, lastMessageId]);
 
   // Also scroll when the tab regains focus (the list may have been hidden
   // while inactive, which cancels scrolls on web). Returning to the chat
-  // always means: show the newest first.
+  // always means: show the newest first. The 250ms timeout is a final
+  // safety net for slow layouts on mobile browsers.
   useEffect(() => {
     if (isFocused && messages.length > 0) {
       requestAnimationFrame(() => {
-        listRef.current?.scrollToEnd({ animated: false });
+        listRef.current?.scrollToOffset({ offset: 1e9, animated: false });
       });
+      const t = setTimeout(() => {
+        if (nearBottomRef.current) {
+          listRef.current?.scrollToOffset({ offset: 1e9, animated: false });
+        }
+      }, 250);
+      return () => clearTimeout(t);
     }
+    return undefined;
   }, [isFocused]);
 
   const replyPreview = useMemo(() => {
@@ -307,7 +315,7 @@ export default function ChatScreen() {
             // After any content growth (new message, image load) pin to the
             // newest message — but only while she's reading near the bottom.
             if (isFocusedRef.current && nearBottomRef.current) {
-              listRef.current?.scrollToEnd({ animated: false });
+              listRef.current?.scrollToOffset({ offset: 1e9, animated: false });
             }
           }}
           renderItem={({ item }) => (

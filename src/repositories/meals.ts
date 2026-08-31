@@ -1,5 +1,5 @@
 import { getSupabase, isSupabaseConfigured } from '@/core/services/supabase';
-import type { Meal, MealType } from '@/models';
+import type { Meal, MealComponent, MealType } from '@/models';
 import { mockMeals, nextMockId } from './mockStore';
 
 /** Self-love food logging. */
@@ -47,6 +47,7 @@ export interface MealInput {
   meal_type: MealType;
   meal_name: string;
   calories?: number | null;
+  components?: MealComponent[] | null;
   image_url?: string | null;
   notes?: string | null;
   meal_time: string; // HH:mm

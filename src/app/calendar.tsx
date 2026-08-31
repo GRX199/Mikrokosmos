@@ -318,6 +318,12 @@ export default function CalendarScreen() {
                           <Text style={[styles.mealMeta, { color: palette.textFaint }]}>
                             {mealMeta(meal.meal_type).label} · {shortTime(meal.meal_time)}
                           </Text>
+                          {/* Component breakdown from the photo analysis */}
+                          {meal.components && meal.components.length > 0 ? (
+                            <Text style={[styles.mealComponents, { color: palette.textSecondary }]}>
+                              {meal.components.map((c) => `${c.name} ${formatNumber(c.calories)}`).join(' · ')}
+                            </Text>
+                          ) : null}
                         </View>
                         <Text
                           style={[
@@ -450,6 +456,7 @@ const styles = StyleSheet.create({
   mealInfo: { flex: 1 },
   mealTitle: { fontSize: 13.5, fontWeight: '700' },
   mealMeta: { fontSize: 11.5, marginTop: 1 },
+  mealComponents: { fontSize: 11, marginTop: 3, fontStyle: 'italic' },
   mealKcal: { fontSize: 12.5 },
   mealTotalRow: {
     flexDirection: 'row',

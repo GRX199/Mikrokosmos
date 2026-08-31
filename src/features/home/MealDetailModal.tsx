@@ -110,6 +110,30 @@ export function MealDetailModal({
                   </View>
                 ) : null}
 
+                {/* Component breakdown from the photo analysis */}
+                {meal.components && meal.components.length > 0 ? (
+                  <View style={[styles.componentsCard, { backgroundColor: theme.light }]}>
+                    <Text style={[styles.componentsTitle, { color: theme.accent }]}>
+                      ✨ What's inside
+                    </Text>
+                    {meal.components.map((part) => (
+                      <View key={part.name} style={styles.componentRow}>
+                        <Text style={[styles.componentName, { color: palette.text }]}>
+                          {part.name}
+                        </Text>
+                        <Text style={[styles.componentKcal, { color: palette.textSecondary }]}>
+                          {formatNumber(part.calories)} kcal
+                        </Text>
+                      </View>
+                    ))}
+                    {meal.calories != null ? (
+                      <Text style={[styles.componentsNote, { color: palette.textFaint }]}>
+                        Total ≈ {formatNumber(meal.calories)} kcal
+                      </Text>
+                    ) : null}
+                  </View>
+                ) : null}
+
                 {/* Notes */}
                 {meal.notes ? (
                   <View style={[styles.detailRow, { borderBottomColor: palette.border }]}>
@@ -220,6 +244,34 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 16,
     fontStyle: 'italic',
+  },
+  componentsCard: {
+    borderRadius: RADIUS.md,
+    padding: 14,
+    marginBottom: 8,
+  },
+  componentsTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    marginBottom: 6,
+  },
+  componentRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 3,
+  },
+  componentName: {
+    fontSize: 13,
+  },
+  componentKcal: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  componentsNote: {
+    fontSize: 11,
+    marginTop: 6,
+    fontStyle: 'italic',
+    textAlign: 'right',
   },
   emptyState: {
     padding: 32,
