@@ -159,7 +159,12 @@ export default function HomeScreen() {
         </View>
 
         {/* Recent activity */}
-        <SectionTitle title="Recent Activity" />
+        <SectionTitle
+          title="Recent Activity"
+          actionLabel="History"
+          icon="calendar-outline"
+          onAction={() => router.push('/calendar')}
+        />
         {data.activities.length === 0 ? (
           <EmptyState
             emoji="🌙"

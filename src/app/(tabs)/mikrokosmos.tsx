@@ -47,18 +47,6 @@ export default function ChatScreen() {
   const [isFocused, setIsFocused] = useState(true);
   const isFocusedRef = useRef(true);
 
-  useFocusEffect(
-    useCallback(() => {
-      setIsFocused(true);
-      isFocusedRef.current = true;
-      clearUnread();
-      return () => {
-        setIsFocused(false);
-        isFocusedRef.current = false;
-      };
-    }, [])
-  );
-
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [reactions, setReactions] = useState<Record<string, MessageReaction[]>>({});
   const [profileMap, setProfileMap] = useState<Record<string, Profile>>({});
@@ -100,12 +88,31 @@ export default function ChatScreen() {
     load();
   }, [load]);
 
-  // Live updates: append incoming messages in realtime.
+  // Catch up on anything missed while the tab was in the background —
+  // realtime can drop events (reconnects, deep sleep).
+  useFocusEffect(
+    useCallback(() => {
+      setIsFocused(true);
+      isFocusedRef.current = true;
+      clearUnread();
+      load();
+      return () => {
+        setIsFocused(false);
+        isFocusedRef.current = false;
+      };
+    }, [load])
+  );
+
+  // Live updates: append incoming messages in realtime (kept sorted so the
+  // newest message always lands at the bottom, even if events arrive late).
   useEffect(() => {
     const unsubscribe = subscribeToMessages((incoming) => {
-      setMessages((prev) =>
-        prev.some((m) => m.id === incoming.id) ? prev : [...prev, incoming]
-      );
+      setMessages((prev) => {
+        if (prev.some((m) => m.id === incoming.id)) return prev;
+        return [...prev, incoming].sort(
+          (a, b) => a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id)
+        );
+      });
       loadReactions([incoming]);
       // Increment unread if chat is not focused (use ref to avoid recreating subscription)
       if (!isFocusedRef.current) {
@@ -136,7 +143,16 @@ export default function ChatScreen() {
     const replyId = replyTo?.id ?? null;
     setReplyTo(null);
     try {
-      await sendMessage(profile.id, { message: text, reply_to: replyId });
+      const sent = await sendMessage(profile.id, { message: text, reply_to: replyId });
+      // Optimistic: append immediately so the message is visible even before
+      // the realtime echo arrives (channels can drop events).
+      setMessages((prev) =>
+        prev.some((m) => m.id === sent.id)
+          ? prev
+          : [...prev, sent].sort(
+              (a, b) => a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id)
+            )
+      );
       if (!isSupabaseRealtime()) await load(); // mock mode: refresh manually
       // Miko replies to messages that mention her (only on the sender's device,
       // so the bot never gets duplicated across the 3 friends).
@@ -155,12 +171,19 @@ export default function ChatScreen() {
       });
       if (result.canceled || !result.assets[0]) return;
       const path = await uploadImage(profile.id, result.assets[0].uri, 'chat');
-      await sendMessage(profile.id, {
+      const sent = await sendMessage(profile.id, {
         message: draft.trim() || '📸',
         message_type: 'image',
         media_url: path ?? result.assets[0].uri,
         reply_to: replyTo?.id ?? null,
       });
+      setMessages((prev) =>
+        prev.some((m) => m.id === sent.id)
+          ? prev
+          : [...prev, sent].sort(
+              (a, b) => a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id)
+            )
+      );
       setReplyTo(null);
       setDraft('');
       if (!isSupabaseRealtime()) await load();

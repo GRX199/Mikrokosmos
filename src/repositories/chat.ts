@@ -12,8 +12,12 @@ type Listener = () => void;
 const mockListeners = new Set<Listener>();
 
 export async function fetchMessages(limit = 100): Promise<ChatMessage[]> {
+  const sorted = (msgs: ChatMessage[]) =>
+    [...msgs].sort(
+      (a, b) => a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id)
+    );
   if (!isSupabaseConfigured) {
-    return [...mockMessages].sort((a, b) => a.created_at.localeCompare(b.created_at)).slice(-limit);
+    return sorted(mockMessages).slice(-limit);
   }
   const { data, error } = await getSupabase()
     .from('messages')
@@ -21,7 +25,7 @@ export async function fetchMessages(limit = 100): Promise<ChatMessage[]> {
     .order('created_at', { ascending: false })
     .limit(limit);
   if (error) throw new Error(error.message);
-  return ((data ?? []) as ChatMessage[]).reverse();
+  return sorted((data ?? []) as ChatMessage[]);
 }
 
 export interface SendMessageInput {

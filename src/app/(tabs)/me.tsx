@@ -156,6 +156,12 @@ export default function MeScreen() {
             onPress={() => router.push('/achievements')}
           />
           <MenuItem
+            icon="calendar-outline"
+            label="Activity Calendar"
+            hint="Day-by-day history of your little universe"
+            onPress={() => router.push('/calendar')}
+          />
+          <MenuItem
             icon="key-outline"
             label="Change Password"
             hint={isMock ? 'Connect Supabase to enable' : 'Keep your universe safe'}
