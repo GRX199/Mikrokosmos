@@ -84,14 +84,17 @@ export function mikoLine(event: MikoEvent, profile?: Profile | null): string {
 
 // ---------- AI-powered chat reply (spec section 20) ----------
 
-// Groq (primary) — free tier: ~14,400 req/day, super fast LPU inference
+// Groq (primary) — free tier, super fast LPU inference.
+// Model chain: providers deprecate models without notice (llama-3.1-8b was
+// removed Aug 2026), so we try in order and cache the first that answers.
 const GROQ_API_KEY = process.env.EXPO_PUBLIC_GROQ_API_KEY ?? '';
-const GROQ_MODEL = 'llama-3.1-8b-instant';
+const GROQ_MODELS = ['openai/gpt-oss-20b', 'openai/gpt-oss-120b', 'groq/compound-mini'];
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
-
+let groqModelCache: string | null = null;
 // Gemini (fallback for vision only — food photo analysis)
 const GEMINI_API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY ?? '';
-const GEMINI_MODEL = 'gemini-flash-latest';
+const GEMINI_MODELS = ['gemini-3.6-flash', 'gemini-flash-latest'];
+let geminiModelCache: string | null = null;
 
 const MIKO_SYSTEM = `You are Miko, a warm and playful AI assistant for Mikrokosmos — a private app for 3 best friends.
 
@@ -204,7 +207,9 @@ async function askGroq(
   senderName: string,
   convo: string
 ): Promise<string | null> {
-  const call = async (): Promise<{ text: string | null; retryable: boolean }> => {
+  const call = async (
+    model: string
+  ): Promise<{ text: string | null; retryable: boolean; modelDead: boolean }> => {
     try {
       const res = await fetchWithTimeout(GROQ_URL, {
         method: 'POST',
@@ -213,7 +218,7 @@ async function askGroq(
           'Authorization': `Bearer ${GROQ_API_KEY}`,
         },
         body: JSON.stringify({
-          model: GROQ_MODEL,
+          model,
           messages: [
             { role: 'system', content: MIKO_SYSTEM },
             { role: 'user', content: `Recent chat:\n${convo}\n\n${senderName} just said: "${message}"\n\nReply as Miko:` },
@@ -223,25 +228,43 @@ async function askGroq(
         }),
       });
       if (!res.ok) {
-        if (isRetryable(res.status)) return { text: null, retryable: true };
+        // 404 = model decommissioned -> try the next model in the chain.
+        if (res.status === 404) return { text: null, retryable: false, modelDead: true };
+        if (isRetryable(res.status)) return { text: null, retryable: true, modelDead: false };
         console.error('[Miko] Groq rejected:', res.status, await res.text().catch(() => ''));
-        return { text: null, retryable: false };
+        return { text: null, retryable: false, modelDead: false };
       }
       const data = await res.json();
       const text: string | undefined = data?.choices?.[0]?.message?.content;
-      return { text: text?.trim() ? text.trim().slice(0, 600) : null, retryable: false };
+      return {
+        text: text?.trim() ? text.trim().slice(0, 600) : null,
+        retryable: false,
+        modelDead: false,
+      };
     } catch (err) {
       console.warn('[Miko] Groq network error:', err instanceof Error ? err.message : err);
-      return { text: null, retryable: true };
+      return { text: null, retryable: true, modelDead: false };
     }
   };
 
-  let result = await call();
-  if (!result.text && result.retryable) {
-    await sleep(1200);
-    result = await call();
+  // Cached working model first, then the rest of the chain.
+  const chain = groqModelCache
+    ? [groqModelCache, ...GROQ_MODELS.filter((m) => m !== groqModelCache)]
+    : GROQ_MODELS;
+  for (const model of chain) {
+    let result = await call(model);
+    if (!result.text && result.retryable) {
+      await sleep(1200);
+      result = await call(model);
+    }
+    if (result.text) {
+      groqModelCache = model;
+      return result.text;
+    }
+    if (!result.modelDead && !result.retryable) return null; // hard failure (auth etc.)
+    // modelDead or still retryable-failed: fall through to the next model
   }
-  return result.text;
+  return null;
 }
 
 // ---------- Gemini (fallback) ----------
@@ -258,46 +281,58 @@ async function askGemini(
 
   const prompt = `${MIKO_SYSTEM}\n\nRecent chat:\n${convo}\n\n${senderName} just said: "${message}"\n\nReply as Miko:`;
 
-  for (let attempt = 0; attempt < 2; attempt++) {
-    try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
-      const res = await fetchWithTimeout(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-goog-api-key': GEMINI_API_KEY,
-        },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.8, maxOutputTokens: 1024 },
-        }),
-      });
+  // Chain: gemini-3.6-flash (current) -> gemini-flash-latest (alias).
+  const chain = geminiModelCache
+    ? [geminiModelCache, ...GEMINI_MODELS.filter((m) => m !== geminiModelCache)]
+    : GEMINI_MODELS;
+  for (const model of chain) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+        const res = await fetchWithTimeout(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-goog-api-key': GEMINI_API_KEY,
+          },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.8, maxOutputTokens: 1024 },
+          }),
+        });
 
-      if (res.status === 429) {
-        const errorData = await res.json().catch(() => null);
-        const retryInfo = errorData?.error?.details?.find(
-          (d: any) => d['@type']?.includes('RetryInfo')
-        );
-        const retrySeconds = retryInfo?.retryDelay
-          ? parseInt(retryInfo.retryDelay)
-          : 60;
-        setQuotaExceeded(retrySeconds || 60);
-        return null;
+        if (res.status === 429) {
+          const errorData = await res.json().catch(() => null);
+          const retryInfo = errorData?.error?.details?.find(
+            (d: any) => d['@type']?.includes('RetryInfo')
+          );
+          const retrySeconds = retryInfo?.retryDelay
+            ? parseInt(retryInfo.retryDelay)
+            : 60;
+          setQuotaExceeded(retrySeconds || 60);
+          return null;
+        }
+
+        // 404 = decommissioned model -> next in chain; 503 overload -> retry.
+        if (res.status === 404) break;
+        if (isRetryable(res.status) && attempt === 0) {
+          await sleep(1200);
+          continue;
+        }
+
+        if (!res.ok) return null;
+        const data = await res.json();
+        const text: string | undefined = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        const clean = text?.trim();
+        if (clean) {
+          geminiModelCache = model;
+          return clean.slice(0, 600);
+        }
+        break;
+      } catch {
+        if (attempt === 0) continue;
+        break;
       }
-
-      if (isRetryable(res.status) && attempt === 0) {
-        await sleep(1200);
-        continue;
-      }
-
-      if (!res.ok) return null;
-      const data = await res.json();
-      const text: string | undefined = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-      const clean = text?.trim();
-      return clean ? clean.slice(0, 600) : null;
-    } catch {
-      if (attempt === 0) continue;
-      return null;
     }
   }
   return null;

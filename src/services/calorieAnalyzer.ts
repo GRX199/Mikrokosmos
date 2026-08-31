@@ -27,12 +27,17 @@ export interface FoodAnalysis {
 }
 
 const GEMINI_API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY ?? '';
-const GEMINI_MODEL = 'gemini-flash-latest';
+const GEMINI_MODELS = ['gemini-3.6-flash', 'gemini-flash-latest'];
+let geminiModelCache: string | null = null;
 
+// Groq — model chains (verified live Aug 2026; llama-3.1-8b/llama-4-scout
+// were decommissioned). Vision needs an image-capable model.
 const GROQ_API_KEY = process.env.EXPO_PUBLIC_GROQ_API_KEY ?? '';
-const GROQ_VISION_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct';
-const GROQ_TEXT_MODEL = 'llama-3.1-8b-instant';
+const GROQ_VISION_MODELS = ['qwen/qwen3.8-27b', 'openai/gpt-oss-120b'];
+const GROQ_TEXT_MODELS = ['openai/gpt-oss-20b', 'openai/gpt-oss-120b', 'groq/compound-mini'];
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
+let groqVisionModelCache: string | null = null;
+let groqTextModelCache: string | null = null;
 
 const REQUEST_TIMEOUT_MS = 25_000;
 const RETRY_DELAYS_MS = [800, 2200]; // after 1st / 2nd failure
@@ -139,68 +144,88 @@ Use typical portion sizes. Be positive — never mention dieting or judgment. Ro
 
 async function callGeminiVision(base64: string): Promise<FoodAnalysis | null> {
   if (!GEMINI_API_KEY || !base64) return null;
-  return withRetry(async () => {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
-    const res = await fetchWithTimeout(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-goog-api-key': GEMINI_API_KEY },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              { text: PHOTO_PROMPT },
-              { inline_data: { mime_type: 'image/jpeg', data: base64 } },
-            ],
-          },
-        ],
-        generationConfig: { response_mime_type: 'application/json', temperature: 0.3 },
-      }),
+  const chain = geminiModelCache
+    ? [geminiModelCache, ...GEMINI_MODELS.filter((m) => m !== geminiModelCache)]
+    : GEMINI_MODELS;
+  for (const model of chain) {
+    const result = await withRetry(async () => {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+      const res = await fetchWithTimeout(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-goog-api-key': GEMINI_API_KEY },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                { text: PHOTO_PROMPT },
+                { inline_data: { mime_type: 'image/jpeg', data: base64 } },
+              ],
+            },
+          ],
+          generationConfig: { response_mime_type: 'application/json', temperature: 0.3 },
+        }),
+      });
+      if (!res.ok) {
+        if (!isRetryable(res.status)) return null;
+        throw new Error(`gemini ${res.status}`); // signal retry
+      }
+      const data = await res.json();
+      const text: string | undefined = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      return text ? parseAnalysisJson(text, 'gemini-vision') : null;
     });
-    if (!res.ok) {
-      if (!isRetryable(res.status)) return null;
-      throw new Error(`gemini ${res.status}`); // signal retry
+    if (result) {
+      geminiModelCache = model;
+      return result;
     }
-    const data = await res.json();
-    const text: string | undefined = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-    return text ? parseAnalysisJson(text, 'gemini-vision') : null;
-  });
+  }
+  return null;
 }
 
 // ---------- Groq vision fallback: photo → calorie estimate ----------
 
 async function callGroqVision(base64: string): Promise<FoodAnalysis | null> {
   if (!GROQ_API_KEY || !base64) return null;
-  return withRetry(async () => {
-    const res = await fetchWithTimeout(GROQ_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${GROQ_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: GROQ_VISION_MODEL,
-        messages: [
-          {
-            role: 'user',
-            content: [
-              { type: 'text', text: PHOTO_PROMPT },
-              { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64}` } },
-            ],
-          },
-        ],
-        temperature: 0.3,
-        max_completion_tokens: 1024,
-        response_format: { type: 'json_object' },
-      }),
+  const chain = groqVisionModelCache
+    ? [groqVisionModelCache, ...GROQ_VISION_MODELS.filter((m) => m !== groqVisionModelCache)]
+    : GROQ_VISION_MODELS;
+  for (const model of chain) {
+    const result = await withRetry(async () => {
+      const res = await fetchWithTimeout(GROQ_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${GROQ_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            {
+              role: 'user',
+              content: [
+                { type: 'text', text: PHOTO_PROMPT },
+                { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64}` } },
+              ],
+            },
+          ],
+          temperature: 0.3,
+          max_completion_tokens: 1024,
+          response_format: { type: 'json_object' },
+        }),
+      });
+      if (!res.ok) {
+        if (!isRetryable(res.status)) return null;
+        throw new Error(`groq ${res.status}`);
+      }
+      const data = await res.json();
+      const text: string | undefined = data?.choices?.[0]?.message?.content;
+      return text ? parseAnalysisJson(text, 'groq-vision') : null;
     });
-    if (!res.ok) {
-      if (!isRetryable(res.status)) return null;
-      throw new Error(`groq ${res.status}`);
+    if (result) {
+      groqVisionModelCache = model;
+      return result;
     }
-    const data = await res.json();
-    const text: string | undefined = data?.choices?.[0]?.message?.content;
-    return text ? parseAnalysisJson(text, 'groq-vision') : null;
-  });
+  }
+  return null;
 }
 
 // ---------- Groq text: food name → calorie estimate (primary) ----------
@@ -212,56 +237,76 @@ Use typical portion sizes. Be positive — never mention dieting or judgment. Ro
 
 async function callGroqText(name: string): Promise<FoodAnalysis | null> {
   if (!GROQ_API_KEY) return null;
-  return withRetry(async () => {
-    const res = await fetchWithTimeout(GROQ_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${GROQ_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: GROQ_TEXT_MODEL,
-        messages: [
-          { role: 'system', content: 'You are a nutrition assistant. Always respond with valid JSON only, no markdown.' },
-          { role: 'user', content: NAME_PROMPT(name) },
-        ],
-        temperature: 0.3,
-        max_completion_tokens: 512,
-        response_format: { type: 'json_object' },
-      }),
+  const chain = groqTextModelCache
+    ? [groqTextModelCache, ...GROQ_TEXT_MODELS.filter((m) => m !== groqTextModelCache)]
+    : GROQ_TEXT_MODELS;
+  for (const model of chain) {
+    const result = await withRetry(async () => {
+      const res = await fetchWithTimeout(GROQ_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${GROQ_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: 'system', content: 'You are a nutrition assistant. Always respond with valid JSON only, no markdown.' },
+            { role: 'user', content: NAME_PROMPT(name) },
+          ],
+          temperature: 0.3,
+          max_completion_tokens: 512,
+          response_format: { type: 'json_object' },
+        }),
+      });
+      if (!res.ok) {
+        if (!isRetryable(res.status)) return null;
+        throw new Error(`groq ${res.status}`);
+      }
+      const data = await res.json();
+      const text: string | undefined = data?.choices?.[0]?.message?.content;
+      return text ? parseAnalysisJson(text, 'groq') : null;
     });
-    if (!res.ok) {
-      if (!isRetryable(res.status)) return null;
-      throw new Error(`groq ${res.status}`);
+    if (result) {
+      groqTextModelCache = model;
+      return result;
     }
-    const data = await res.json();
-    const text: string | undefined = data?.choices?.[0]?.message?.content;
-    return text ? parseAnalysisJson(text, 'groq') : null;
-  });
+  }
+  return null;
 }
 
 // ---------- Gemini text: food name → calorie estimate (fallback) ----------
 
 async function callGeminiText(name: string): Promise<FoodAnalysis | null> {
   if (!GEMINI_API_KEY) return null;
-  return withRetry(async () => {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
-    const res = await fetchWithTimeout(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-goog-api-key': GEMINI_API_KEY },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: NAME_PROMPT(name) }] }],
-        generationConfig: { response_mime_type: 'application/json', temperature: 0.3 },
-      }),
+  const chain = geminiModelCache
+    ? [geminiModelCache, ...GEMINI_MODELS.filter((m) => m !== geminiModelCache)]
+    : GEMINI_MODELS;
+  for (const model of chain) {
+    const result = await withRetry(async () => {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+      const res = await fetchWithTimeout(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-goog-api-key': GEMINI_API_KEY },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: NAME_PROMPT(name) }] }],
+          generationConfig: { response_mime_type: 'application/json', temperature: 0.3 },
+        }),
+      });
+      if (!res.ok) {
+        if (!isRetryable(res.status)) return null;
+        throw new Error(`gemini ${res.status}`);
+      }
+      const data = await res.json();
+      const text: string | undefined = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      return text ? parseAnalysisJson(text, 'gemini') : null;
     });
-    if (!res.ok) {
-      if (!isRetryable(res.status)) return null;
-      throw new Error(`gemini ${res.status}`);
+    if (result) {
+      geminiModelCache = model;
+      return result;
     }
-    const data = await res.json();
-    const text: string | undefined = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-    return text ? parseAnalysisJson(text, 'gemini') : null;
-  });
+  }
+  return null;
 }
 
 // ---------- Offline fallback: local food database ----------
