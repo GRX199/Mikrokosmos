@@ -83,7 +83,7 @@ export default function HomeScreen() {
     // If the trio is now complete, Miko celebrates in chat.
     const todays = await fetchCheckinsForDate(todayKey()).catch(() => []);
     const allIn = data!.profiles.every((p) => todays.some((c) => c.user_id === p.id));
-    await celebrateCheckin(profile, allIn);
+    await celebrateCheckin(profile, allIn, language);
 
     // Streak milestone → gentle achievement badge activity (Phase 2).
     const myCheckins = await fetchUserCheckins(profile.id).catch(() => []);

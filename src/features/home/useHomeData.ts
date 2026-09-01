@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { todayKey } from '@/core/utils/date';
+import type { AppLanguage } from '@/core/i18n/I18nProvider';
 import type {
   Activity,
   DailyCheckin,
@@ -104,11 +105,11 @@ export function friendPerformance(data: HomeData, userId: string): number {
 }
 
 /** Shared helper so check-in logging + Miko celebration stay consistent. */
-export async function celebrateCheckin(profile: Profile, allCheckedIn: boolean) {
+export async function celebrateCheckin(profile: Profile, allCheckedIn: boolean, lang: AppLanguage = 'id') {
   await logActivity(profile.id, 'checkin', `${profile.display_name} started their day ☀️`);
   if (allCheckedIn) {
     const { sendMikoMessage } = await import('@/repositories/chat');
     const { mikoLine } = await import('@/services/miko');
-    await sendMikoMessage(mikoLine('all_checked_in'));
+    await sendMikoMessage(mikoLine('all_checked_in', profile, lang));
   }
 }
