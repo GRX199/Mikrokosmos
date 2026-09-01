@@ -1,5 +1,5 @@
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { ThemeProvider as NavigationThemeProvider } from 'expo-router';
@@ -11,6 +11,7 @@ import { ThemeProvider, useAppTheme } from '@/core/theme';
 import { I18nProvider } from '@/core/i18n/I18nProvider';
 import { AppearanceProvider, useAppearanceMode } from '@/core/appearance/AppearanceProvider';
 import { LoadingView } from '@/components/LoadingView';
+import { bindNudgeNavigation, configureNotifications } from '@/services/nudges';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -54,6 +55,16 @@ function RootNavigator() {
 function AppStack({ ready }: { ready: boolean }) {
   const { theme, palette } = useAppTheme();
   const { mode } = useAppearanceMode();
+  const router = useRouter();
+
+  // Local notifications: configure once + wire nudge taps to navigation.
+  useEffect(() => {
+    configureNotifications().catch(() => undefined);
+    return bindNudgeNavigation((path) => {
+      router.push(path as Parameters<typeof router.push>[0]);
+    });
+  }, [router]);
+
   if (!ready) return <LoadingView />;
 
   return (

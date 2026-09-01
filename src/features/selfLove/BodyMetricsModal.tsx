@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import {
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -102,182 +104,201 @@ export function BodyMetricsModal({
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={[styles.backdrop, { backgroundColor: palette.overlay }]} onPress={onClose}>
-        <Pressable onPress={() => {}} style={styles.sheetAnchor}>
-          <RoundedCard style={styles.sheet}>
-            <View style={styles.header}>
-              <Text style={[styles.title, { color: palette.text }]}>My Body 🌸</Text>
-              <Pressable onPress={onClose} style={styles.closeButton}>
-                <Ionicons name="close" size={22} color={palette.textSecondary} />
-              </Pressable>
-            </View>
-            <Text style={[styles.privacyNote, { color: palette.textFaint }]}>
-              Only you can see these numbers — never your friends 💗
-            </Text>
-
-            <ScrollView showsVerticalScrollIndicator={false} style={styles.body}>
-              {/* Numbers */}
-              <SoftInput
-                placeholder={t('Height (cm)')}
-                value={height}
-                onChangeText={(t) => setHeight(t.replace(/[^0-9.]/g, ''))}
-                keyboardType="numeric"
-                containerStyle={styles.field}
-              />
-              <SoftInput
-                placeholder={t('Weight (kg)')}
-                value={weight}
-                onChangeText={(t) => setWeight(t.replace(/[^0-9.]/g, ''))}
-                keyboardType="numeric"
-                containerStyle={styles.field}
-              />
-              <SoftInput
-                placeholder={t('Age')}
-                value={age}
-                onChangeText={(t) => setAge(t.replace(/[^0-9]/g, ''))}
-                keyboardType="numeric"
-                containerStyle={styles.field}
-              />
-
-              {/* Sex */}
-              <Text style={[styles.sectionLabel, { color: palette.textSecondary }]}>Body</Text>
-              <View style={styles.chipRow}>
-                {(['female', 'male'] as Sex[]).map((option) => (
-                  <Pressable
-                    key={option}
-                    onPress={() => setSex(option)}
-                    style={[
-                      styles.chip,
-                      {
-                        backgroundColor: sex === option ? theme.primary : palette.card,
-                        borderColor: sex === option ? theme.primary : palette.border,
-                      },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.chipLabel,
-                        { color: sex === option ? palette.white : palette.text },
-                      ]}
-                    >
-                      {option === 'female' ? '♀ Female' : '♂ Male'}
-                    </Text>
-                  </Pressable>
-                ))}
+      <KeyboardAvoidingView
+        style={[styles.backdrop, { backgroundColor: palette.overlay }]}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <Pressable style={styles.backdropFill} onPress={onClose}>
+          <Pressable onPress={() => {}} style={styles.sheetAnchor}>
+            <RoundedCard style={styles.sheet}>
+              <View style={styles.header}>
+                <Text style={[styles.title, { color: palette.text }]}>{t('My Body 🌸')}</Text>
+                <Pressable onPress={onClose} style={styles.closeButton}>
+                  <Ionicons name="close" size={22} color={palette.textSecondary} />
+                </Pressable>
               </View>
-
-              {/* Activity */}
-              <Text style={[styles.sectionLabel, { color: palette.textSecondary }]}>
-                Daily activity
+              <Text style={[styles.privacyNote, { color: palette.textFaint }]}>
+                {t('Only you can see these numbers — never your friends 💗')}
               </Text>
-              <View style={styles.chipRow}>
-                {ACTIVITY_OPTIONS.map((option) => (
-                  <Pressable
-                    key={option.key}
-                    onPress={() => setActivity(option.key)}
-                    style={[
-                      styles.chip,
-                      {
-                        backgroundColor: activity === option.key ? theme.primary : palette.card,
-                        borderColor: activity === option.key ? theme.primary : palette.border,
-                      },
-                    ]}
-                  >
-                    <Text
+
+              <ScrollView showsVerticalScrollIndicator={false} style={styles.body}>
+                {/* Numbers */}
+                <SoftInput
+                  placeholder={t('Height (cm)')}
+                  value={height}
+                  onChangeText={(v) => setHeight(v.replace(/[^0-9.]/g, ''))}
+                  keyboardType="numeric"
+                  containerStyle={styles.field}
+                />
+                <SoftInput
+                  placeholder={t('Weight (kg)')}
+                  value={weight}
+                  onChangeText={(v) => setWeight(v.replace(/[^0-9.]/g, ''))}
+                  keyboardType="numeric"
+                  containerStyle={styles.field}
+                />
+                <SoftInput
+                  placeholder={t('Age')}
+                  value={age}
+                  onChangeText={(v) => setAge(v.replace(/[^0-9.]/g, ''))}
+                  keyboardType="numeric"
+                  containerStyle={styles.field}
+                />
+
+                {/* Sex */}
+                <Text style={[styles.sectionLabel, { color: palette.textSecondary }]}>{t('Body')}</Text>
+                <View style={styles.chipRow}>
+                  {(['female', 'male'] as Sex[]).map((option) => (
+                    <Pressable
+                      key={option}
+                      onPress={() => setSex(option)}
                       style={[
-                        styles.chipLabel,
-                        { color: activity === option.key ? palette.white : palette.text },
+                        styles.chip,
+                        {
+                          backgroundColor: sex === option ? theme.primary : palette.card,
+                          borderColor: sex === option ? theme.primary : palette.border,
+                        },
                       ]}
                     >
-                      {option.hint}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-
-              {/* Goal */}
-              <Text style={[styles.sectionLabel, { color: palette.textSecondary }]}>
-                My gentle goal
-              </Text>
-              <View style={styles.chipRow}>
-                {GOAL_OPTIONS.map((option) => (
-                  <Pressable
-                    key={option.key}
-                    onPress={() => setGoal(option.key)}
-                    style={[
-                      styles.chip,
-                      {
-                        backgroundColor: goal === option.key ? theme.primary : palette.card,
-                        borderColor: goal === option.key ? theme.primary : palette.border,
-                      },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.chipLabel,
-                        { color: goal === option.key ? palette.white : palette.text },
-                      ]}
-                    >
-                      {option.label} · {option.hint}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-
-              {/* Live preview */}
-              {preview.targetCalories ? (
-                <View style={[styles.previewCard, { backgroundColor: theme.light }]}>
-                  <Text style={[styles.previewTitle, { color: theme.accent }]}>
-                    Your kind daily target ≈ {preview.targetCalories} kcal
-                  </Text>
-                  <Text style={[styles.previewRow, { color: palette.textSecondary }]}>
-                    BMI {preview.bmi} · {preview.bmiEmoji} {preview.bmiLabel}
-                  </Text>
-                  <Text style={[styles.previewRow, { color: palette.textSecondary }]}>
-                    BMR {preview.bmr} kcal · maintenance {preview.tdee} kcal
-                  </Text>
-                  {preview.estimatedDays ? (
-                    <Text style={[styles.previewRow, { color: palette.textSecondary }]}>
-                      Healthy range in ~{preview.estimatedDays} days at this gentle pace ✨
-                    </Text>
-                  ) : null}
-                  {!preview.isHealthyDeficit ? (
-                    <Text style={[styles.previewNote, { color: palette.textFaint }]}>
-                      We keep your target safe — never below what your body needs.
-                    </Text>
-                  ) : null}
+                      <Text
+                        style={[
+                          styles.chipLabel,
+                          { color: sex === option ? palette.white : palette.text },
+                        ]}
+                      >
+                        {option === 'female' ? `♀ ${t('Female')}` : `♂ ${t('Male')}`}
+                      </Text>
+                    </Pressable>
+                  ))}
                 </View>
-              ) : null}
 
-              <PrimaryButton
-                label={t('Save My Body 💗')}
-                onPress={handleSave}
-                disabled={!valid}
-                loading={saving}
-                style={styles.saveButton}
-              />
-              {!valid ? (
-                <Text style={[styles.validNote, { color: palette.textFaint }]}>
-                  Fill height, weight and age to unlock your smart target.
+                {/* Activity */}
+                <Text style={[styles.sectionLabel, { color: palette.textSecondary }]}>
+                  {t('Daily activity')}
                 </Text>
-              ) : null}
-            </ScrollView>
-          </RoundedCard>
+                <View style={styles.chipRow}>
+                  {ACTIVITY_OPTIONS.map((option) => (
+                    <Pressable
+                      key={option.key}
+                      onPress={() => setActivity(option.key)}
+                      style={[
+                        styles.chip,
+                        {
+                          backgroundColor: activity === option.key ? theme.primary : palette.card,
+                          borderColor: activity === option.key ? theme.primary : palette.border,
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.chipLabel,
+                          { color: activity === option.key ? palette.white : palette.text },
+                        ]}
+                      >
+                        {t(option.hint)}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+
+                {/* Goal */}
+                <Text style={[styles.sectionLabel, { color: palette.textSecondary }]}>
+                  {t('My gentle goal')}
+                </Text>
+                <View style={styles.chipRow}>
+                  {GOAL_OPTIONS.map((option) => (
+                    <Pressable
+                      key={option.key}
+                      onPress={() => setGoal(option.key)}
+                      style={[
+                        styles.chip,
+                        {
+                          backgroundColor: goal === option.key ? theme.primary : palette.card,
+                          borderColor: goal === option.key ? theme.primary : palette.border,
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.chipLabel,
+                          { color: goal === option.key ? palette.white : palette.text },
+                        ]}
+                      >
+                        {t(option.label)} · {t(option.hint)}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+
+                {/* Live preview */}
+                {preview.targetCalories ? (
+                  <View style={[styles.previewCard, { backgroundColor: theme.light }]}>
+                    <Text style={[styles.previewTitle, { color: theme.accent }]}>
+                      {t('Your kind daily target ≈')} {preview.targetCalories} kcal
+                    </Text>
+                    <Text style={[styles.previewRow, { color: palette.textSecondary }]}>
+                      BMI {preview.bmi} · {preview.bmiEmoji} {t(preview.bmiLabel)}
+                    </Text>
+                    <Text style={[styles.previewRow, { color: palette.textSecondary }]}>
+                      BMR {preview.bmr} kcal · {t('maintenance')} {preview.tdee} kcal
+                    </Text>
+                    {preview.estimatedDays ? (
+                      <Text style={[styles.previewRow, { color: palette.textSecondary }]}>
+                        ~{preview.estimatedDays} {t('days to healthy range')} ✨
+                      </Text>
+                    ) : null}
+                    {!preview.isHealthyDeficit ? (
+                      <Text style={[styles.previewNote, { color: palette.textFaint }]}>
+                        {t('We keep your target safe — never below what your body needs.')}
+                      </Text>
+                    ) : null}
+                  </View>
+                ) : null}
+
+                <PrimaryButton
+                  label={t('Save My Body 💗')}
+                  onPress={handleSave}
+                  disabled={!valid}
+                  loading={saving}
+                  style={styles.saveButton}
+                />
+                {!valid ? (
+                  <Text style={[styles.validNote, { color: palette.textFaint }]}>
+                    {t('Fill height, weight and age to unlock your smart target.')}
+                  </Text>
+                ) : null}
+              </ScrollView>
+            </RoundedCard>
+          </Pressable>
         </Pressable>
-      </Pressable>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, justifyContent: 'flex-end', alignItems: 'center' },
-  sheetAnchor: { width: '100%', maxWidth: 520, padding: 12 },
-  sheet: { maxHeight: '86%', padding: 18 },
+  backdrop: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+  },
+  backdropFill: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    width: '100%',
+  },
+  sheetAnchor: { width: '100%', maxWidth: 520, padding: 12, paddingBottom: 20 },
+  sheet: {
+    maxHeight: '86%',
+    padding: 18,
+    paddingBottom: 8,
+  },
+  body: { flexGrow: 0, flexShrink: 1 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   title: { fontSize: 19, fontWeight: '800' },
   closeButton: { padding: 6 },
   privacyNote: { fontSize: 11.5, fontStyle: 'italic', marginTop: 4, marginBottom: 10 },
-  body: { flexGrow: 0 },
   field: { marginBottom: 10 },
   sectionLabel: { fontSize: 12.5, fontWeight: '700', marginTop: 10, marginBottom: 8 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 6 },

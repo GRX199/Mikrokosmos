@@ -7,6 +7,7 @@ import { Avatar } from '@/components/Avatar';
 import { EmptyState } from '@/components/EmptyState';
 import { ErrorState } from '@/components/ErrorState';
 import { LoadingView } from '@/components/LoadingView';
+import { scheduleNudge, cancelNudge } from '@/services/nudges';
 import { GradientCard, RoundedCard } from '@/components/RoundedCard';
 import { Screen } from '@/components/Screen';
 import { SectionTitle } from '@/components/SectionTitle';
@@ -68,8 +69,14 @@ export default function HomeScreen() {
   React.useEffect(() => {
     if (data && profile && !data.checkins[profile.id]) {
       setCheckinOpen(true);
+      // Schedule a gentle reminder for tomorrow morning (09:30) in case
+      // she leaves without checking in — cancelled the moment she does.
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(9, 30, 0, 0);
+      scheduleNudge('morning_checkin', language, tomorrow).catch(() => undefined);
     }
-  }, [data, profile]);
+  }, [data, profile, language]);
 
   if (loading && !data) return <LoadingView label={t('Waking up your universe…')} />;
   if (error && !data) return <ErrorState message={error} onRetry={refresh} />;
@@ -80,6 +87,8 @@ export default function HomeScreen() {
   async function handleCheckin(wakeUpTime: string, mood: Mood) {
     if (!profile) return;
     await createCheckin(profile.id, todayKey(), { wake_up_time: wakeUpTime, mood });
+    // She checked in — the morning nudge is no longer needed.
+    cancelNudge('morning_checkin').catch(() => undefined);
     // If the trio is now complete, Miko celebrates in chat.
     const todays = await fetchCheckinsForDate(todayKey()).catch(() => []);
     const allIn = data!.profiles.every((p) => todays.some((c) => c.user_id === p.id));

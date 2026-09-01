@@ -44,6 +44,7 @@ import { computeBodyInsights } from '@/services/bodyInsights';
 import { useAuth } from '@/features/auth/SessionProvider';
 import { AddMealModal } from '@/features/selfLove/AddMealModal';
 import { BodyMetricsModal } from '@/features/selfLove/BodyMetricsModal';
+import { cancelNudge, scheduleNudge } from '@/services/nudges';
 
 /** Self Love — health & diet space with gentle wording (spec sections 11-18). */
 export default function SelfLoveScreen() {
@@ -168,9 +169,16 @@ export default function SelfLoveScreen() {
     const next = Math.max(0, water + delta);
     setWaterCount(next);
     await setWater(profile.id, date, next);
+    // Water nudges: halfway → gentle sip; goal reached → nothing more today.
+    cancelNudge('water_early').catch(() => undefined);
+    cancelNudge('water_goal').catch(() => undefined);
     if (delta > 0 && next === goals!.water_goal) {
       await logActivity(profile.id, 'water_goal', `${profile.display_name} completed today's water goal 💧`);
       await sendMikoMessage(mikoLine('goal_completed', profile, language));
+    } else if (delta > 0 && next === goals!.water_goal - 1) {
+      // One glass left — remind her softly in ~45 minutes.
+      const at = new Date(Date.now() + 45 * 60 * 1000);
+      scheduleNudge('water_goal', language, at).catch(() => undefined);
     }
   }
 

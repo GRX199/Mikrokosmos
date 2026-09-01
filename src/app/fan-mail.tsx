@@ -28,6 +28,7 @@ import {
   replyFanMail,
 } from '@/repositories/fanmail';
 import { generateFanLetter } from '@/services/fanbot';
+import { cancelNudge } from '@/services/nudges';
 
 /**
  * Fan Mail 💌 — bot fans write letters to THIS member; she reads them
@@ -77,6 +78,7 @@ export default function FanMailScreen() {
         question: draft.question,
       });
       setMails((prev) => [mail, ...prev]);
+      cancelNudge('fan_mail').catch(() => undefined);
     } catch (e) {
       Alert.alert(t('Fan Mail 💌'), t('The letter got lost in the mail… try again?'));
     } finally {

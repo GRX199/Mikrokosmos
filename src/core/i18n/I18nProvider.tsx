@@ -405,6 +405,32 @@ const ID: Record<string, string> = {
   'the fan loved your reply': 'fansmu menyukai balasanmu',
   'Fan questions for you': 'Pertanyaan fans untukmu',
   'Fans ask, you answer 💗': 'Fans bertanya, kamu menjawab 💗',
+
+  // ── Body metrics modal ─────────────────────────────────────────
+  'Only you can see these numbers — never your friends 💗':
+    'Hanya kamu yang bisa melihat angka ini — tidak pernah temanmu 💗',
+  'desk life 🌱': 'hidup meja 🌱',
+  'walks & chores 🚶': 'jalan-jalan & pekerjaan 🚶',
+  'exercise 3-5 days 🏃': 'olahraga 3-5 hari 🏃',
+  'exercise 6-7 days 🔥': 'olahraga 6-7 hari 🔥',
+  'intense daily training 🏆': 'latihan harian intens 🏆',
+  'My gentle goal': 'Target lembutku',
+  'feel good as I am 🌿': 'nyaman seperti sekarang 🌿',
+  '−0.25 kg / week 🌸': '−0.25 kg / minggu 🌸',
+  '−0.5 kg / week 🌷': '−0.5 kg / minggu 🌷',
+  '−0.75 kg / week ✨': '−0.75 kg / minggu ✨',
+  'Your kind daily target ≈': 'Target harianmu ≈',
+  'a bit under': 'sedikit kurang',
+  'just right': 'pas banget',
+  'a little above': 'sedikit lebih',
+  'above range': 'di atas rentang',
+  'maintenance': 'pemeliharaan',
+  'We keep your target safe — never below what your body needs.':
+    'Target kami aman — tidak pernah di bawah kebutuhan tubuhmu.',
+  'Fill height, weight and age to unlock your smart target.':
+    'Isi tinggi, berat, dan usia untuk membuka target cerdasmu.',
+  'Healthy range in ~{n} days at this gentle pace ✨':
+    'Rentang sehat dalam ~{n} hari dengan ritme lembut ini ✨',
 };
 
 export interface I18nContextValue {
@@ -482,3 +508,4 @@ export function useI18n() {
 
 
 
+
