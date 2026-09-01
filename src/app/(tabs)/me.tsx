@@ -30,12 +30,15 @@ import {
 import { fetchCompletedTrendsCount } from '@/repositories/trends';
 import { computeStreak } from '@/services/streak';
 import { useAuth } from '@/features/auth/SessionProvider';
+import { SettingsModal } from '@/features/me/SettingsModal';
+import { useI18n } from '@/core/i18n/I18nProvider';
 
 /** Me tab — own profile, stats, privacy and settings (spec sections 26-27). */
 export default function MeScreen() {
   const { profile, refreshProfile, signOut, isMock } = useAuth();
   const { theme, palette } = useAppTheme();
   const router = useRouter();
+  const { t } = useI18n();
 
   const [stats, setStats] = useState({ streak: 0, checkins: 0, meals: 0, trendsDone: 0 });
   const [privacy, setPrivacy] = useState<PrivacySettings | null>(null);
@@ -43,6 +46,7 @@ export default function MeScreen() {
   const [privacyOpen, setPrivacyOpen] = useState(false);
   const [passwordOpen, setPasswordOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const load = useCallback(async () => {
     if (!profile) return;
@@ -82,22 +86,22 @@ export default function MeScreen() {
   function confirmLogout() {
     if (Platform.OS === 'web') {
       // React Native's Alert is a no-op on web — use the browser dialog instead.
-      if (window.confirm('Log out? You can always come back to your universe ✨')) {
+      if (window.confirm(t('Log out? You can always come back to your universe ✨'))) {
         signOut();
       }
       return;
     }
-    Alert.alert('Log out?', 'You can always come back to your universe ✨', [
-      { text: 'Stay', style: 'cancel' },
-      { text: 'Log out', onPress: () => signOut() },
+    Alert.alert(t('Log out?'), t('You can always come back to your universe ✨'), [
+      { text: t('Stay'), style: 'cancel' },
+      { text: t('Log out'), onPress: () => signOut() },
     ]);
   }
 
   const statItems = [
-    { emoji: '🔥', value: stats.streak, label: 'Day Streak' },
-    { emoji: '💗', value: stats.checkins, label: 'Self Love Days' },
-    { emoji: '🍱', value: stats.meals, label: 'Meals Logged' },
-    { emoji: '✨', value: stats.trendsDone, label: 'Trends Done' },
+    { emoji: '🔥', value: stats.streak, label: t('Day Streak') },
+    { emoji: '💗', value: stats.checkins, label: t('Self Love Days') },
+    { emoji: '🍱', value: stats.meals, label: t('Meals Logged') },
+    { emoji: '✨', value: stats.trendsDone, label: t('Trends Done') },
   ];
 
   return (
@@ -139,49 +143,55 @@ export default function MeScreen() {
         <RoundedCard style={styles.menu}>
           <MenuItem
             icon="shield-checkmark-outline"
-            label="Privacy"
-            hint="Control what friends can see"
+            label={t('Privacy')}
+            hint={t('Control what friends can see')}
             onPress={() => setPrivacyOpen(true)}
           />
           <MenuItem
             icon="heart-circle-outline"
-            label="Memories"
-            hint="Your shared scrapbook"
+            label={t('Memories')}
+            hint={t('Your shared scrapbook')}
             onPress={() => router.push('/memories')}
           />
           <MenuItem
             icon="ribbon-outline"
-            label="Achievements"
-            hint="Gentle milestone badges"
+            label={t('Achievements')}
+            hint={t('Gentle milestone badges')}
             onPress={() => router.push('/achievements')}
           />
           <MenuItem
             icon="calendar-outline"
-            label="Activity Calendar"
-            hint="Day-by-day history of your little universe"
+            label={t('Activity Calendar')}
+            hint={t('Day-by-day history of your little universe')}
             onPress={() => router.push('/calendar')}
           />
           <MenuItem
             icon="key-outline"
-            label="Change Password"
-            hint={isMock ? 'Connect Supabase to enable' : 'Keep your universe safe'}
+            label={t('Change Password')}
+            hint={isMock ? t('Connect Supabase to enable') : t('Keep your universe safe')}
             onPress={() =>
               isMock
-                ? Alert.alert('Demo mode', 'Password changes need the live Supabase backend.')
+                ? Alert.alert(t('Demo mode'), t('Password changes need the live Supabase backend.'))
                 : setPasswordOpen(true)
             }
           />
           <MenuItem
+            icon="settings-outline"
+            label={t('Settings')}
+            hint={t('App Language & Theme')}
+            onPress={() => setSettingsOpen(true)}
+          />
+          <MenuItem
             icon="sparkles-outline"
-            label="About Mikrokosmos"
-            hint="Our little universe"
+            label={t('About Mikrokosmos')}
+            hint={t('Our little universe')}
             onPress={() => setAboutOpen(true)}
           />
-          <MenuItem icon="log-out-outline" label="Log Out" danger onPress={confirmLogout} last />
+          <MenuItem icon="log-out-outline" label={t('Log Out')} danger onPress={confirmLogout} last />
         </RoundedCard>
 
         <Text style={[styles.footer, { color: palette.textFaint }]}>
-          Made with 💗 by Namy, Kyra & Jessy
+          {t('Made with 💗 by Namy, Kyra & Jessy')}
         </Text>
       </ScrollView>
 
@@ -243,6 +253,7 @@ export default function MeScreen() {
       </Modal>
 
       <ChangePasswordModal visible={passwordOpen} onClose={() => setPasswordOpen(false)} />
+      <SettingsModal visible={settingsOpen} onClose={() => setSettingsOpen(false)} />
 
       {/* About modal */}
       <Modal visible={aboutOpen} transparent animationType="fade" onRequestClose={() => setAboutOpen(false)}>
@@ -314,6 +325,7 @@ function EditProfileModal({
 }) {
   const { profile } = useAuth();
   const { theme, palette } = useAppTheme();
+  const { t } = useI18n();
   const [displayName, setDisplayName] = useState('');
   const [emoji, setEmoji] = useState('✨');
   const [bio, setBio] = useState('');
@@ -355,7 +367,7 @@ function EditProfileModal({
           <SoftInput
             value={displayName}
             onChangeText={setDisplayName}
-            placeholder="What friends call you"
+            placeholder={t('What friends call you')}
             placeholderTextColor={palette.textFaint}
             style={{ color: palette.text }}
           />
@@ -383,7 +395,7 @@ function EditProfileModal({
           <SoftInput
             value={bio}
             onChangeText={setBio}
-            placeholder="A tiny line about you…"
+            placeholder={t('A tiny line about you…')}
             placeholderTextColor={palette.textFaint}
             style={{ color: palette.text }}
             multiline
@@ -402,6 +414,7 @@ function EditProfileModal({
 
 function ChangePasswordModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const { palette } = useAppTheme();
+  const { t } = useI18n();
   const [next, setNext] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -417,7 +430,7 @@ function ChangePasswordModal({ visible, onClose }: { visible: boolean; onClose: 
     if (!isSupabaseConfigured) return;
     setError(null);
     if (next.length < 6) {
-      setError('New password needs at least 6 characters ✨');
+      setError(t('New password needs at least 6 characters ✨'));
       return;
     }
     setSaving(true);
@@ -426,7 +439,7 @@ function ChangePasswordModal({ visible, onClose }: { visible: boolean; onClose: 
       if (authError) {
         setError(authError.message);
       } else {
-        Alert.alert('Password updated 🔐', 'Your universe is safe.');
+        Alert.alert(t('Password updated 🔐'), t('Your universe is safe.'));
         onClose();
       }
     } finally {
@@ -439,18 +452,18 @@ function ChangePasswordModal({ visible, onClose }: { visible: boolean; onClose: 
       <View style={[styles.sheetBackdrop, { backgroundColor: palette.overlay }]}>
         <View style={[styles.sheet, { backgroundColor: palette.card }]}>
           <Text style={[styles.sheetTitle, { color: palette.text }]}>Change Password 🔐</Text>
-          <Text style={[styles.fieldLabel, { color: palette.textSecondary }]}>New password</Text>
+          <Text style={[styles.fieldLabel, { color: palette.textSecondary }]}>{t('New password')}</Text>
           <SoftInput
             value={next}
             onChangeText={setNext}
-            placeholder="New password"
+            placeholder={t('New password')}
             placeholderTextColor={palette.textFaint}
             secureTextEntry
             style={{ color: palette.text }}
           />
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
           <View style={styles.sheetGap} />
-          <PrimaryButton label="Update Password" onPress={handleSave} loading={saving} />
+          <PrimaryButton label={t('Update Password')} onPress={handleSave} loading={saving} />
           <Pressable onPress={onClose} style={styles.laterButton}>
             <Text style={[styles.laterText, { color: palette.textSecondary }]}>Cancel</Text>
           </Pressable>

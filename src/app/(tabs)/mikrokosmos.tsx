@@ -35,6 +35,7 @@ import { fetchProfiles } from '@/repositories/profiles';
 import { resolveMediaUrl, uploadImage } from '@/repositories/storage';
 import { useAuth } from '@/features/auth/SessionProvider';
 import { askMiko, mikoFallbackReply, getQuotaExceededMessage, isQuotaExceeded } from '@/services/miko';
+import { useI18n } from '@/core/i18n';
 import { clearUnread, incrementUnread } from '@/stores/unreadChatStore';
 import { useFocusEffect } from 'expo-router';
 
@@ -42,6 +43,7 @@ import { useFocusEffect } from 'expo-router';
 export default function ChatScreen() {
   const { profile } = useAuth();
   const { theme, palette } = useAppTheme();
+  const { t, language } = useI18n();
   const insets = useSafeAreaInsets();
   const listRef = useRef<FlatList<ChatMessage>>(null);
   const [isFocused, setIsFocused] = useState(true);
@@ -81,7 +83,7 @@ export default function ChatScreen() {
       setProfileMap(map);
       await loadReactions(msgs);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not open the chat.');
+      setError(e instanceof Error ? e.message : t('Could not open the chat.'));
     } finally {
       setLoading(false);
     }
@@ -248,10 +250,11 @@ export default function ChatScreen() {
         messages.map((m) => ({
           who: m.is_bot ? 'Miko' : profileMap[m.sender_id ?? '']?.display_name ?? 'Friend',
           text: m.message,
-        }))
+        })),
+        language
       );
       // Use quota message if quota exceeded, otherwise use reply or fallback
-      const mikoReply = reply ?? (isQuotaExceeded() ? getQuotaExceededMessage() : mikoFallbackReply());
+      const mikoReply = reply ?? (isQuotaExceeded() ? getQuotaExceededMessage(language) : mikoFallbackReply(language));
       const sent = await sendMikoMessage(mikoReply);
       if (sent) {
         // Optimistic append — same guarantee as regular sends.
@@ -272,7 +275,7 @@ export default function ChatScreen() {
     }
   }
 
-  if (loading) return <LoadingView label="Opening the group chat…" />;
+  if (loading) return <LoadingView label={t('Opening the group chat…')} />;
   if (error) return <ErrorState message={error} onRetry={load} />;
 
   return (
@@ -340,7 +343,7 @@ export default function ChatScreen() {
                     {MIKO.emoji} Miko
                   </Text>
                   <Text style={[styles.mikoTypingText, { color: palette.textSecondary }]}>
-                    thinking…
+                    {t('thinking…')}
                   </Text>
                 </View>
               </View>
@@ -379,7 +382,7 @@ export default function ChatScreen() {
             <TextInput
               value={draft}
               onChangeText={setDraft}
-              placeholder="Say something cute…"
+              placeholder={t('Say something cute…')}
               placeholderTextColor={palette.textFaint}
               style={[styles.input, { color: palette.text }]}
               multiline
@@ -457,6 +460,7 @@ function MessageBubble({
   onReply: () => void;
 }) {
   const { theme, palette } = useAppTheme();
+  const { language } = useI18n();
 
   if (message.is_bot) {
     return (
@@ -467,7 +471,7 @@ function MessageBubble({
           </Text>
           <Text style={[styles.mikoText, { color: palette.text }]}>{message.message}</Text>
           <Text style={[styles.timeText, { color: palette.textFaint }]}>
-            {relativeTime(message.created_at)}
+            {relativeTime(message.created_at, language)}
           </Text>
         </View>
       </View>
@@ -527,7 +531,7 @@ function MessageBubble({
           {message.message}
         </Text>
         <Text style={[styles.timeText, { color: mine ? 'rgba(255,255,255,0.75)' : palette.textFaint }]}>
-          {relativeTime(message.created_at)}
+          {relativeTime(message.created_at, language)}
         </Text>
       </Pressable>
 

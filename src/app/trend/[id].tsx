@@ -20,6 +20,7 @@ import { RoundedCard } from '@/components/RoundedCard';
 import { Screen } from '@/components/Screen';
 import { SoftInput } from '@/components/SoftInput';
 import { RADIUS, trendStatusMeta, TREND_STATUSES, useAppTheme } from '@/core/theme';
+import { useI18n } from '@/core/i18n';
 import type { Profile, Trend, TrendStatus, TrendTask } from '@/models';
 import { logActivity } from '@/repositories/activities';
 import { sendMikoMessage } from '@/repositories/chat';
@@ -49,6 +50,7 @@ export default function TrendDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { profile } = useAuth();
   const { theme, palette } = useAppTheme();
+  const { t, language } = useI18n();
 
   const [trend, setTrend] = useState<Trend | null>(null);
   const [tasks, setTasks] = useState<TrendTask[]>([]);
@@ -76,7 +78,7 @@ export default function TrendDetailScreen() {
       for (const p of profiles) map[p.id] = p;
       setProfileMap(map);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not open this trend.');
+      setError(e instanceof Error ? e.message : t('Could not open this trend.'));
     } finally {
       setLoading(false);
     }
@@ -88,7 +90,7 @@ export default function TrendDetailScreen() {
     return unsubscribe;
   }, [load]);
 
-  if (loading && !trend) return <LoadingView label="Opening the trend…" />;
+  if (loading && !trend) return <LoadingView label={t('Opening the trend…')} />;
   if (error && !trend) return <ErrorState message={error} onRetry={load} />;
   if (!trend) return <ErrorState message="This trend drifted away." onRetry={() => router.back()} />;
 
@@ -108,7 +110,7 @@ export default function TrendDetailScreen() {
       // Celebration moment (spec §24): modal first, activity + Miko after.
       setCelebrate(true);
       await logActivity(profile.id, 'trend_done', `${profile.display_name} finished "${trend.title}" ✅`);
-      await sendMikoMessage(mikoLine('trend_completed', profile));
+      await sendMikoMessage(mikoLine('trend_completed', profile, language));
     }
   }
 
@@ -144,10 +146,10 @@ export default function TrendDetailScreen() {
   }
 
   function confirmDeleteTask(task: TrendTask) {
-    Alert.alert('Remove this task?', task.title, [
-      { text: 'Keep it', style: 'cancel' },
+    Alert.alert(t('Remove this task?'), task.title, [
+      { text: t('Keep it'), style: 'cancel' },
       {
-        text: 'Remove',
+        text: t('Remove'),
         style: 'destructive',
         onPress: async () => {
           await deleteTask(task.id);
@@ -158,10 +160,10 @@ export default function TrendDetailScreen() {
   }
 
   async function confirmDeleteTrend() {
-    Alert.alert('Delete this trend?', trend!.title, [
-      { text: 'Keep it', style: 'cancel' },
+    Alert.alert(t('Delete this trend?'), trend!.title, [
+      { text: t('Keep it'), style: 'cancel' },
       {
-        text: 'Delete',
+        text: t('Delete'),
         style: 'destructive',
         onPress: async () => {
           await deleteTrend(trend!.id);
@@ -198,7 +200,7 @@ export default function TrendDetailScreen() {
               style={[styles.sourceChip, { backgroundColor: palette.card, borderColor: palette.border }]}
             >
               <Text style={[styles.chipLabel, { color: palette.textSecondary }]}>
-                {status.emoji} {status.label}
+                {status.emoji} {t(status.label)}
               </Text>
             </View>
           </View>
@@ -264,7 +266,7 @@ export default function TrendDetailScreen() {
                     { color: active ? palette.white : palette.textSecondary },
                   ]}
                 >
-                  {s.emoji} {s.label}
+                  {s.emoji} {t(s.label)}
                 </Text>
               </Pressable>
             );
@@ -322,7 +324,7 @@ export default function TrendDetailScreen() {
             <SoftInput
               value={taskDraft}
               onChangeText={setTaskDraft}
-              placeholder="Add a step…"
+              placeholder={t('Add a step…')}
               placeholderTextColor={palette.textFaint}
               style={[styles.taskInput, { color: palette.text }]}
               onSubmitEditing={handleAddTask}
@@ -358,7 +360,7 @@ export default function TrendDetailScreen() {
             <Text style={[styles.celebrateText, { color: palette.textSecondary }]}>
               "{trend.title}" is officially done. Want to save this moment to Mikrokosmos Memories?
             </Text>
-            <PrimaryButton label="Save Memory 💌" onPress={handleSaveMemory} />
+            <PrimaryButton label={t('Save Memory 💌')} onPress={handleSaveMemory} />
             <Pressable onPress={() => setCelebrate(false)} style={styles.laterButton}>
               <Text style={[styles.laterText, { color: palette.textSecondary }]}>Maybe Later</Text>
             </Pressable>

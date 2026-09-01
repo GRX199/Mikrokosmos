@@ -28,6 +28,7 @@ import {
 import { MorningCheckinModal } from '@/features/home/MorningCheckinModal';
 import { MealDetailModal } from '@/features/home/MealDetailModal';
 import { todayKey } from '@/core/utils/date';
+import { useI18n } from '@/core/i18n';
 
 const ACTIVITY_ICONS: Record<string, string> = {
   checkin: '☀️',
@@ -46,6 +47,7 @@ const ACTIVITY_ICONS: Record<string, string> = {
 export default function HomeScreen() {
   const router = useRouter();
   const { profile } = useAuth();
+  const { t, language } = useI18n();
   const { theme, palette } = useAppTheme();
   const { data, loading, error, refresh } = useHomeData(profile?.id);
 
@@ -69,7 +71,7 @@ export default function HomeScreen() {
     }
   }, [data, profile]);
 
-  if (loading && !data) return <LoadingView label="Waking up your universe…" />;
+  if (loading && !data) return <LoadingView label={t('Waking up your universe…')} />;
   if (error && !data) return <ErrorState message={error} onRetry={refresh} />;
   if (!data || !profile) return null;
 
@@ -92,7 +94,7 @@ export default function HomeScreen() {
         'achievement',
         `${profile.display_name} reached a ${newStreak}-day streak 🔥 Keep glowing!`
       );
-      await sendMikoMessage(mikoLine('new_streak', profile));
+      await sendMikoMessage(mikoLine('new_streak', profile, language));
     }
 
     setCheckinOpen(false);
@@ -116,24 +118,27 @@ export default function HomeScreen() {
         {/* Daily greeting */}
         <GradientCard style={styles.greeting}>
           <Text style={[styles.greetingTitle, { color: palette.text }]}>
-            {greetingFor(phase)}, {profile.display_name} {profile.emoji}
+            {t(greetingFor(phase))}, {profile.display_name} {profile.emoji}
           </Text>
           <Text style={[styles.greetingSubtitle, { color: palette.textSecondary }]}>
-            Welcome back to your little universe.
+            {t('Welcome back to your little universe.')}
           </Text>
           <Text style={[styles.greetingDate, { color: palette.textSecondary }]}>
-            {friendlyDate()}
+            {friendlyDate(new Date(), language)}
           </Text>
           <View style={styles.chipRow}>
             <View style={[styles.chip, { backgroundColor: palette.card }]}>
               <Text style={[styles.chipText, { color: theme.accent }]}>
-                {data.myStreak > 0 ? `🔥 ${data.myStreak} Day Streak` : '🌱 A fresh day'}
+                {data.myStreak > 0
+                  ? `🔥 ${data.myStreak} ${t('Day Streak')}`
+                  : t('🌱 A fresh day')}
               </Text>
             </View>
             {myCheckin ? (
               <View style={[styles.chip, { backgroundColor: palette.card }]}>
                 <Text style={[styles.chipText, { color: theme.accent }]}>
-                  {moodMeta(myCheckin.mood).emoji} Feeling {moodMeta(myCheckin.mood).label.toLowerCase()}
+                  {moodMeta(myCheckin.mood).emoji} {t('Feeling')}{' '}
+                  {t(moodMeta(myCheckin.mood).label).toLowerCase()}
                 </Text>
               </View>
             ) : null}
@@ -141,7 +146,7 @@ export default function HomeScreen() {
         </GradientCard>
 
         {/* Friend status */}
-        <SectionTitle title="Our Mikrokosmos Today" />
+        <SectionTitle title={t('Our Mikrokosmos Today')} />
         <View style={styles.friendColumn}>
           {data.profiles.map((friend) => (
             <FriendCard
@@ -160,16 +165,16 @@ export default function HomeScreen() {
 
         {/* Recent activity */}
         <SectionTitle
-          title="Recent Activity"
-          actionLabel="History"
+          title={t('Recent Activity')}
+          actionLabel={t('History')}
           icon="calendar-outline"
           onAction={() => router.push('/calendar')}
         />
         {data.activities.length === 0 ? (
           <EmptyState
             emoji="🌙"
-            title="Quiet in the universe so far"
-            subtitle="Check in, log a meal or add a trend — it will show up here."
+            title={t('Quiet in the universe so far')}
+            subtitle={t('Check in, log a meal or add a trend — it will show up here.')}
           />
         ) : (
           <RoundedCard style={styles.activityCard}>
@@ -292,6 +297,7 @@ function FriendCard({
 
 function ActivityRow({ activity, isLast, onPress }: { activity: Activity; isLast: boolean; onPress: () => void }) {
   const { theme, palette } = useAppTheme();
+  const { language } = useI18n();
   return (
     <Pressable
       onPress={onPress}
@@ -306,7 +312,7 @@ function ActivityRow({ activity, isLast, onPress }: { activity: Activity; isLast
       </View>
       <Text style={[styles.activityText, { color: palette.text }]}>{activity.text}</Text>
       <Text style={[styles.activityTime, { color: palette.textFaint }]}>
-        {relativeTime(activity.created_at)}
+        {relativeTime(activity.created_at, language)}
       </Text>
       <Ionicons name="chevron-forward" size={14} color={palette.textFaint} />
     </Pressable>

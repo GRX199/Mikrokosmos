@@ -1,4 +1,5 @@
 import type { Profile } from '@/models';
+import type { AppLanguage } from '@/core/i18n/I18nProvider';
 
 /**
  * Miko — the group's biggest fan (spec section 20).
@@ -19,66 +20,104 @@ export type MikoEvent =
 
 interface MikoRule {
   event: MikoEvent;
-  lines: ((name: string) => string)[];
+  lines: Partial<Record<AppLanguage, ((name: string) => string)[]>> & { en: ((name: string) => string)[] };
 }
 
 const RULES: MikoRule[] = [
   {
     event: 'goal_completed',
-    lines: [
-      (n) => `BREAKING NEWS 🚨 ${n} completed a daily goal. Historic moment for Mikrokosmos.`,
-      (n) => `${n} just crushed a goal. The universe is impressed ✨`,
-    ],
+    lines: {
+      en: [
+        (n) => `BREAKING NEWS 🚨 ${n} completed a daily goal. Historic moment for Mikrokosmos.`,
+        (n) => `${n} just crushed a goal. The universe is impressed ✨`,
+      ],
+      id: [
+        (n) => `BERITA TERBARU 🚨 ${n} menyelesaikan satu tujuan hari ini. Momen bersejarah untuk Mikrokosmos.`,
+        (n) => `${n} baru saja menuntaskan satu target. Semesta terkesan ✨`,
+      ],
+    },
   },
   {
     event: 'new_streak',
-    lines: [
-      (n) => `${n} is on a streak 🔥 Someone stop them (don't).`,
-      (n) => `Streak unlocked by ${n}. Consistency queen behavior 👑`,
-    ],
+    lines: {
+      en: [
+        (n) => `${n} is on a streak 🔥 Someone stop them (don't).`,
+        (n) => `Streak unlocked by ${n}. Consistency queen behavior 👑`,
+      ],
+      id: [
+        (n) => `${n} sedang on fire 🔥 Jangan dihentikan (purapura saja).`,
+        (n) => `Streak terbuka oleh ${n}. Ratu konsisten sejati 👑`,
+      ],
+    },
   },
   {
     event: 'meal_added',
-    lines: [
-      (n) => `${n} logged a meal. Fueling the friendship 🍱`,
-      (n) => `${n} ate something and told us about it. We approve 🥹`,
-    ],
+    lines: {
+      en: [
+        (n) => `${n} logged a meal. Fueling the friendship 🍱`,
+        (n) => `${n} ate something and told us about it. We approve 🥹`,
+      ],
+      id: [
+        (n) => `${n} mencatat makanannya. Mengisi energi persahabatan 🍱`,
+        (n) => `${n} makan lalu bercerita. Kami setujui 🥹`,
+      ],
+    },
   },
   {
     event: 'trend_completed',
-    lines: [
-      (n) => `${n} finished a trend! This is what peak performance looks like 💅`,
-      () => `A trend has been conquered. Mikrokosmos celebrates 🎉`,
-    ],
+    lines: {
+      en: [
+        (n) => `${n} finished a trend! This is what peak performance looks like 💅`,
+        () => `A trend has been conquered. Mikrokosmos celebrates 🎉`,
+      ],
+      id: [
+        (n) => `${n} menyelesaikan sebuah tren! Inilah wujud performa terbaik 💅`,
+        () => `Satu tren telah ditaklukkan. Mikrokosmos ikut merayakan 🎉`,
+      ],
+    },
   },
   {
     event: 'all_checked_in',
-    lines: [
-      () => `All three of you checked in today. The trio is COMPLETE 🌌`,
-      () => `Full house! Everyone started their day together 🥹✨`,
-    ],
+    lines: {
+      en: [
+        () => `All three of you checked in today. The trio is COMPLETE 🌌`,
+        () => `Full house! Everyone started their day together 🥹✨`,
+      ],
+      id: [
+        () => `Kalian bertiga sudah check-in hari ini. Trio itu LENGKAP 🌌`,
+        () => `Rumah penuh! Semua memulai hari bersama-sama 🥹✨`,
+      ],
+    },
   },
   {
     event: 'group_progress',
-    lines: [
-      () => `Group progress is soaring today. I'm proud 😭`,
-      () => `This universe is thriving. Keep glowing ✨`,
-    ],
+    lines: {
+      en: [
+        () => `Group progress is soaring today. I'm proud 😭`,
+        () => `This universe is thriving. Keep glowing ✨`,
+      ],
+      id: [
+        () => `Progres grup melonjak hari ini. Aku bangga 😭`,
+        () => `Semesta ini tumbuh subur. Tetap bersinar ✨`,
+      ],
+    },
   },
   {
     event: 'checkin_early',
-    lines: [
-      (n) => `${n} checked in bright and early. Rise and shine behavior ☀️`,
-    ],
+    lines: {
+      en: [(n) => `${n} checked in bright and early. Rise and shine behavior ☀️`],
+      id: [(n) => `${n} check-in dari pagi buta. Semangat pagi sejati ☀️`],
+    },
   },
 ];
 
-/** Pick a playful Miko line for an event. */
-export function mikoLine(event: MikoEvent, profile?: Profile | null): string {
+/** Pick a playful Miko line for an event (locale-aware). */
+export function mikoLine(event: MikoEvent, profile?: Profile | null, lang: AppLanguage = 'en'): string {
   const rule = RULES.find((r) => r.event === event);
   if (!rule) return '✨';
   const name = profile?.display_name ?? 'Someone';
-  const line = rule.lines[Math.floor(Math.random() * rule.lines.length)];
+  const pool = rule.lines[lang] ?? rule.lines.en;
+  const line = pool[Math.floor(Math.random() * pool.length)];
   return line(name);
 }
 
@@ -117,13 +156,25 @@ You: "Salad bowl dengan quinoa, ayam grilled, dan alpukat itu enak dan balanced,
 
 Never make up facts about the users. Focus on giving real, actionable answers.`;
 
-const FALLBACK_REPLIES = [
-  '✨ The universe heard you!',
-  'Sending good vibes to the trio 🌌',
-  'Miko approves this message 💫',
-  'Keep glowing, Mikrokosmos ✨',
-  'The universe is proud of you all 🥹',
-];
+/** Extra directive appended when the app language is Indonesian. */
+const MIKO_INDONESIAN_DIRECTIVE = `\nLANGUAGE: The app language is Indonesian. ALWAYS reply in casual Bahasa Indonesia (boleh slang: gengs, bestie, guys). Keep the same warm playful tone.`;
+
+const FALLBACK_REPLIES: Record<AppLanguage, string[]> = {
+  en: [
+    '✨ The universe heard you!',
+    'Sending good vibes to the trio 🌌',
+    'Miko approves this message 💫',
+    'Keep glowing, Mikrokosmos ✨',
+    'The universe is proud of you all 🥹',
+  ],
+  id: [
+    '✨ Semesta mendengarmu!',
+    'Mengirim vibes baik ke trio 🌌',
+    'Miko menyetujui pesan ini 💫',
+    'Tetap bersinar, Mikrokosmos ✨',
+    'Semesta bangga pada kalian 🥹',
+  ],
+};
 
 // Track quota exceeded to avoid spamming retries
 let quotaExceededUntil = 0;
@@ -139,10 +190,17 @@ function setQuotaExceeded(seconds: number): void {
   console.warn(`[Miko] Quota exceeded, cooldown for ${seconds}s`);
 }
 
-/** Get a user-friendly message when quota is exceeded. */
-export function getQuotaExceededMessage(): string {
+/** Get a user-friendly message when quota is exceeded (locale-aware). */
+export function getQuotaExceededMessage(lang: AppLanguage = 'en'): string {
   const remainingSeconds = Math.ceil((quotaExceededUntil - Date.now()) / 1000);
   const minutes = Math.ceil(remainingSeconds / 60);
+  if (lang === 'id') {
+    if (minutes >= 60) {
+      const hours = Math.ceil(minutes / 60);
+      return `🌌 Miko sedang istirahat (batas harian tercapai). Dia kembali dalam ${hours} jam! Coba lagi nanti ✨`;
+    }
+    return `🌌 Miko rehat sebentar (batas tercapai). Kembali dalam ~${minutes} menit ✨`;
+  }
   if (minutes >= 60) {
     const hours = Math.ceil(minutes / 60);
     return `🌌 Miko is resting now (daily limit reached). She'll be back in ${hours}h! Try again later ✨`;
@@ -154,7 +212,8 @@ export function getQuotaExceededMessage(): string {
 export async function askMiko(
   message: string,
   senderName: string,
-  history: { who: string; text: string }[]
+  history: { who: string; text: string }[],
+  lang: AppLanguage = 'en'
 ): Promise<string | null> {
   const convo = history
     .slice(-8)
@@ -163,13 +222,13 @@ export async function askMiko(
 
   // Try Groq first (much higher quota, faster)
   if (GROQ_API_KEY) {
-    const groqReply = await askGroq(message, senderName, convo);
+    const groqReply = await askGroq(message, senderName, convo, lang);
     if (groqReply) return groqReply;
   }
 
   // Fallback to Gemini if Groq fails or no key
   if (GEMINI_API_KEY) {
-    return askGemini(message, senderName, convo);
+    return askGemini(message, senderName, convo, lang);
   }
 
   if (!GROQ_API_KEY && !GEMINI_API_KEY) {
@@ -205,8 +264,10 @@ function isRetryable(status: number): boolean {
 async function askGroq(
   message: string,
   senderName: string,
-  convo: string
+  convo: string,
+  lang: AppLanguage = 'en'
 ): Promise<string | null> {
+  const systemPrompt = lang === 'id' ? MIKO_SYSTEM + MIKO_INDONESIAN_DIRECTIVE : MIKO_SYSTEM;
   const call = async (
     model: string
   ): Promise<{ text: string | null; retryable: boolean; modelDead: boolean }> => {
@@ -220,7 +281,7 @@ async function askGroq(
         body: JSON.stringify({
           model,
           messages: [
-            { role: 'system', content: MIKO_SYSTEM },
+            { role: 'system', content: systemPrompt },
             { role: 'user', content: `Recent chat:\n${convo}\n\n${senderName} just said: "${message}"\n\nReply as Miko:` },
           ],
           temperature: 0.8,
@@ -272,14 +333,16 @@ async function askGroq(
 async function askGemini(
   message: string,
   senderName: string,
-  convo: string
+  convo: string,
+  lang: AppLanguage = 'en'
 ): Promise<string | null> {
   if (isQuotaExceeded()) {
     console.warn('[Miko] Gemini quota cooldown active');
     return null;
   }
 
-  const prompt = `${MIKO_SYSTEM}\n\nRecent chat:\n${convo}\n\n${senderName} just said: "${message}"\n\nReply as Miko:`;
+  const systemPrompt = lang === 'id' ? MIKO_SYSTEM + MIKO_INDONESIAN_DIRECTIVE : MIKO_SYSTEM;
+  const prompt = `${systemPrompt}\n\nRecent chat:\n${convo}\n\n${senderName} just said: "${message}"\n\nReply as Miko:`;
 
   // Chain: gemini-3.6-flash (current) -> gemini-flash-latest (alias).
   const chain = geminiModelCache
@@ -338,7 +401,8 @@ async function askGemini(
   return null;
 }
 
-/** Fallback reply when Gemini is unavailable. */
-export function mikoFallbackReply(): string {
-  return FALLBACK_REPLIES[Math.floor(Math.random() * FALLBACK_REPLIES.length)];
+/** Fallback reply when both providers are unavailable (locale-aware). */
+export function mikoFallbackReply(lang: AppLanguage = 'en'): string {
+  const pool = FALLBACK_REPLIES[lang] ?? FALLBACK_REPLIES.en;
+  return pool[Math.floor(Math.random() * pool.length)];
 }

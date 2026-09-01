@@ -24,6 +24,7 @@ import { RoundedCard } from '@/components/RoundedCard';
 import { Screen } from '@/components/Screen';
 import { SoftInput } from '@/components/SoftInput';
 import { RADIUS, useAppTheme } from '@/core/theme';
+import { useI18n } from '@/core/i18n';
 import { relativeTime } from '@/core/utils/date';
 import type { Memory, Profile } from '@/models';
 import { logActivity } from '@/repositories/activities';
@@ -46,6 +47,7 @@ import { useAuth } from '@/features/auth/SessionProvider';
 export default function MemoriesScreen() {
   const { profile } = useAuth();
   const { theme, palette } = useAppTheme();
+  const { t, language } = useI18n();
   const router = useRouter();
 
   const [memories, setMemories] = useState<Memory[]>([]);
@@ -65,7 +67,7 @@ export default function MemoriesScreen() {
       for (const p of profiles) map[p.id] = p;
       setProfileMap(map);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not open the scrapbook.');
+      setError(e instanceof Error ? e.message : t('Could not open the scrapbook.'));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -103,9 +105,9 @@ export default function MemoriesScreen() {
       if (window.confirm(`Remove "${memory.title}" from the scrapbook?`)) void doDelete();
       return;
     }
-    Alert.alert('Remove this memory?', memory.title, [
-      { text: 'Keep it', style: 'cancel' },
-      { text: 'Remove', style: 'destructive', onPress: doDelete },
+    Alert.alert(t('Remove this memory?'), memory.title, [
+      { text: t('Keep it'), style: 'cancel' },
+      { text: t('Remove'), style: 'destructive', onPress: doDelete },
     ]);
   }
 
@@ -130,7 +132,7 @@ export default function MemoriesScreen() {
   }
 
   if (loading && memories.length === 0 && !error) {
-    return <LoadingView label="Opening the scrapbook…" />;
+    return <LoadingView label={t('Opening the scrapbook…')} />;
   }
   if (error && memories.length === 0) {
     return <ErrorState message={error} onRetry={load} />;
@@ -177,9 +179,9 @@ export default function MemoriesScreen() {
         {memories.length === 0 ? (
           <EmptyState
             emoji="💌"
-            title="No memories yet"
-            subtitle={'Finish a trend together and save the moment, or add one by hand.\nIt will live here, cozy forever.'}
-            actionLabel="Save a Memory 💌"
+            title={t('No memories yet')}
+            subtitle={t('Finish a trend together and save the moment, or add one by hand.\nIt will live here, cozy forever.')}
+            actionLabel={t('Save a Memory 💌')}
             onAction={() => setComposerOpen(true)}
           />
         ) : (
@@ -206,7 +208,7 @@ export default function MemoriesScreen() {
                       <Avatar profile={author} size={22} />
                       <Text style={[styles.memoryMeta, { color: palette.textFaint }]}>
                         {author ? `${author.display_name} · ` : ''}
-                        {relativeTime(memory.created_at)}
+                        {relativeTime(memory.created_at, language)}
                       </Text>
                       {isMine ? (
                         <Pressable onPress={() => confirmDelete(memory)} hitSlop={8} style={styles.deleteButton}>
@@ -244,6 +246,7 @@ function MemoryComposerModal({
   onSave: (input: MemoryInput, localImageUri: string | null) => Promise<void>;
 }) {
   const { theme, palette } = useAppTheme();
+  const { t } = useI18n();
   const [title, setTitle] = useState('');
   const [caption, setCaption] = useState('');
   const [imageUri, setImageUri] = useState<string | null>(null);
@@ -296,13 +299,13 @@ function MemoryComposerModal({
             </View>
 
             <SoftInput
-              placeholder="Give this moment a name"
+              placeholder={t('Give this moment a name')}
               value={title}
               onChangeText={setTitle}
               containerStyle={styles.field}
             />
             <SoftInput
-              placeholder="How did it feel? (optional)"
+              placeholder={t('How did it feel? (optional)')}
               value={caption}
               onChangeText={setCaption}
               containerStyle={styles.field}
@@ -322,7 +325,7 @@ function MemoryComposerModal({
                 </Pressable>
               )}
               <PrimaryButton
-                label={imageUri ? 'Change photo' : 'Pick a photo'}
+                label={t(imageUri ? 'Change photo' : 'Pick a photo')}
                 onPress={pickPhoto}
                 variant="soft"
                 style={styles.photoButton}
@@ -330,7 +333,7 @@ function MemoryComposerModal({
             </View>
 
             <PrimaryButton
-              label="Save to Scrapbook 💗"
+              label={t('Save to Scrapbook 💗')}
               onPress={handleSave}
               disabled={!title.trim()}
               loading={saving}

@@ -21,6 +21,7 @@ import { Screen } from '@/components/Screen';
 import { SectionTitle } from '@/components/SectionTitle';
 import { SoftInput } from '@/components/SoftInput';
 import { mealMeta, moodMeta, performanceTier, useAppTheme } from '@/core/theme';
+import { useI18n } from '@/core/i18n';
 import { formatNumber, shortTime, todayKey } from '@/core/utils/date';
 import type { BodyMetrics, DailyCheckin, Goals, Meal, Profile } from '@/models';
 import { fetchCheckin } from '@/repositories/checkins';
@@ -48,6 +49,7 @@ import { BodyMetricsModal } from '@/features/selfLove/BodyMetricsModal';
 export default function SelfLoveScreen() {
   const { profile } = useAuth();
   const { theme, palette } = useAppTheme();
+  const { t, language } = useI18n();
   const date = todayKey();
 
   const [meals, setMeals] = useState<Meal[]>([]);
@@ -110,7 +112,7 @@ export default function SelfLoveScreen() {
       );
       setGroupScores(scores);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not load your self love space.');
+      setError(e instanceof Error ? e.message : t('Could not load your self love space.'));
     } finally {
       setLoading(false);
     }
@@ -139,7 +141,7 @@ export default function SelfLoveScreen() {
     }
   }, [meals]);
 
-  if (loading && !goals) return <LoadingView label="Preparing your self love space…" />;
+  if (loading && !goals) return <LoadingView label={t('Preparing your self love space…')} />;
   if (error && !goals) return <ErrorState message={error} onRetry={load} />;
   if (!profile || !goals) return null;
 
@@ -168,7 +170,7 @@ export default function SelfLoveScreen() {
     await setWater(profile.id, date, next);
     if (delta > 0 && next === goals!.water_goal) {
       await logActivity(profile.id, 'water_goal', `${profile.display_name} completed today's water goal 💧`);
-      await sendMikoMessage(mikoLine('goal_completed', profile));
+      await sendMikoMessage(mikoLine('goal_completed', profile, language));
     }
   }
 
@@ -179,7 +181,7 @@ export default function SelfLoveScreen() {
     await setSteps(profile.id, date, next);
     if (next >= goals!.step_goal && steps < goals!.step_goal) {
       await logActivity(profile.id, 'step_goal', `${profile.display_name} reached their step goal 👟`);
-      await sendMikoMessage(mikoLine('goal_completed', profile));
+      await sendMikoMessage(mikoLine('goal_completed', profile, language));
     }
   }
 
@@ -213,10 +215,10 @@ export default function SelfLoveScreen() {
   }
 
   function confirmDeleteMeal(meal: Meal) {
-    Alert.alert('Remove this meal?', meal.meal_name, [
-      { text: 'Keep it', style: 'cancel' },
+    Alert.alert(t('Remove this meal?'), meal.meal_name, [
+      { text: t('Keep it'), style: 'cancel' },
       {
-        text: 'Remove',
+        text: t('Remove'),
         style: 'destructive',
         onPress: async () => {
           await deleteMeal(meal.id);
@@ -244,9 +246,9 @@ export default function SelfLoveScreen() {
           />
         }
       >
-        <Text style={[styles.header, { color: palette.text }]}>Today's Self Love 💗</Text>
+        <Text style={[styles.header, { color: palette.text }]}>{t("Today's Self Love 💗")}</Text>
         <Text style={[styles.headerSub, { color: palette.textSecondary }]}>
-          Small acts of care, one day at a time.
+          {t('Small acts of care, one day at a time.')}
         </Text>
 
         {/* Overview rings */}
@@ -259,7 +261,7 @@ export default function SelfLoveScreen() {
                 label={`${formatNumber(calories)}`}
                 sublabel={`of ${formatNumber(smartGoal)}`}
               />
-              <Text style={[styles.ringLabel, { color: palette.textSecondary }]}>Calories</Text>
+              <Text style={[styles.ringLabel, { color: palette.textSecondary }]}>{t('Calories')}</Text>
             </View>
             <View style={styles.ringItem}>
               <ProgressRing
@@ -268,7 +270,7 @@ export default function SelfLoveScreen() {
                 label={`${water}`}
                 sublabel={`of ${goals.water_goal}`}
               />
-              <Text style={[styles.ringLabel, { color: palette.textSecondary }]}>Water</Text>
+              <Text style={[styles.ringLabel, { color: palette.textSecondary }]}>{t('Water')}</Text>
             </View>
             <View style={styles.ringItem}>
               <ProgressRing
@@ -277,15 +279,17 @@ export default function SelfLoveScreen() {
                 label={`${formatNumber(steps)}`}
                 sublabel={`of ${formatNumber(goals.step_goal)}`}
               />
-              <Text style={[styles.ringLabel, { color: palette.textSecondary }]}>Steps</Text>
+              <Text style={[styles.ringLabel, { color: palette.textSecondary }]}>{t('Steps')}</Text>
             </View>
           </View>
           <View style={[styles.overviewRow, { backgroundColor: theme.light }]}>
             <Text style={[styles.overviewText, { color: theme.accent }]}>
-              ⏰ Wake Up: {checkin ? shortTime(checkin.wake_up_time) : '—'}
+              ⏰ {t('Wake Up')}: {checkin ? shortTime(checkin.wake_up_time) : '—'}
             </Text>
             <Text style={[styles.overviewText, { color: theme.accent }]}>
-              {checkin ? `${moodMeta(checkin.mood).emoji} ${moodMeta(checkin.mood).label}` : '😊 Check in to share your mood'}
+              {checkin
+                ? `${moodMeta(checkin.mood).emoji} ${t(moodMeta(checkin.mood).label)}`
+                : t('😊 Check in to share your mood')}
             </Text>
           </View>
         </RoundedCard>
@@ -295,11 +299,11 @@ export default function SelfLoveScreen() {
           <Pressable onPress={() => setBodyModalOpen(true)}>
             <RoundedCard style={styles.bodyCard} tinted>
               <View style={styles.bodyHeader}>
-                <Text style={[styles.bodyTitle, { color: palette.text }]}>My Body 🌸</Text>
+                <Text style={[styles.bodyTitle, { color: palette.text }]}>{t('My Body 🌸')}</Text>
                 {bodyInsights.estimatedDays ? (
                   <View style={[styles.bodyBadge, { backgroundColor: theme.light }]}>
                     <Text style={[styles.bodyBadgeText, { color: theme.accent }]}>
-                      ~{bodyInsights.estimatedDays} days to healthy range
+                      ~{bodyInsights.estimatedDays} {t('days to healthy range')}
                     </Text>
                   </View>
                 ) : null}
@@ -310,7 +314,7 @@ export default function SelfLoveScreen() {
                     {formatNumber(bodyInsights.targetCalories)}
                   </Text>
                   <Text style={[styles.bodyStatLabel, { color: palette.textSecondary }]}>
-                    kcal target
+                    {t('kcal target')}
                   </Text>
                 </View>
                 <View style={styles.bodyStat}>
@@ -326,32 +330,33 @@ export default function SelfLoveScreen() {
                     {bodyInsights.weeklyRateKg > 0 ? `−${bodyInsights.weeklyRateKg}` : '🌱'}
                   </Text>
                   <Text style={[styles.bodyStatLabel, { color: palette.textSecondary }]}>
-                    {bodyInsights.weeklyRateKg > 0 ? 'kg / week' : 'maintaining'}
+                    {bodyInsights.weeklyRateKg > 0 ? t('kg / week') : t('maintaining')}
                   </Text>
                 </View>
               </View>
               <Text style={[styles.bodyNote, { color: palette.textFaint }]}>
-                Tap to adjust your numbers — private, always 💗
+                {t('Tap to adjust your numbers — private, always 💗')}
               </Text>
             </RoundedCard>
           </Pressable>
         ) : (
           <Pressable onPress={() => setBodyModalOpen(true)}>
             <RoundedCard style={styles.bodyCard} tinted>
-              <Text style={[styles.bodyTitle, { color: palette.text }]}>Smart calorie target ✨</Text>
+              <Text style={[styles.bodyTitle, { color: palette.text }]}>{t('Smart calorie target ✨')}</Text>
               <Text style={[styles.bodyNote, { color: palette.textSecondary }]}>
-                Add your height, weight and goal — we'll compute a kind daily
-                target just for you (only you can see it).
+                {t(
+                  "Add your height, weight and goal — we'll compute a kind daily target just for you (only you can see it).",
+                )}
               </Text>
             </RoundedCard>
           </Pressable>
         )}
 
         {/* Water tracker */}
-        <SectionTitle title="💧 Water" />
+        <SectionTitle title={t('💧 Water')} />
         <RoundedCard>
           <Text style={[styles.waterCount, { color: palette.text }]}>
-            {water} / {goals.water_goal} glasses
+            {water} / {goals.water_goal} {t('glasses')}
           </Text>
           <View style={styles.glassRow}>
             {Array.from({ length: goals.water_goal }).map((_, i) => (
@@ -365,42 +370,42 @@ export default function SelfLoveScreen() {
               onPress={() => adjustWater(-1)}
               style={[styles.waterButton, { backgroundColor: palette.card, borderColor: palette.border }]}
             >
-              <Text style={[styles.waterButtonText, { color: palette.textSecondary }]}>− Remove</Text>
+              <Text style={[styles.waterButtonText, { color: palette.textSecondary }]}>− {t('Remove')}</Text>
             </Pressable>
             <Pressable
               onPress={() => adjustWater(1)}
               style={[styles.waterButton, { backgroundColor: theme.primary, borderColor: theme.primary }]}
             >
-              <Text style={[styles.waterButtonText, { color: palette.white }]}>+ 1 Glass</Text>
+              <Text style={[styles.waterButtonText, { color: palette.white }]}>+ {t('1 Glass')}</Text>
             </Pressable>
           </View>
         </RoundedCard>
 
         {/* Steps */}
-        <SectionTitle title="👟 Steps" />
+        <SectionTitle title={t('👟 Steps')} />
         <RoundedCard>
           <Text style={[styles.stepsCount, { color: palette.text }]}>
-            {formatNumber(steps)} / {formatNumber(goals.step_goal)} steps
+            {formatNumber(steps)} / {formatNumber(goals.step_goal)} {t('steps')}
           </Text>
           <View style={styles.stepInputRow}>
             <SoftInput
-              placeholder="Enter today's steps"
+              placeholder={t("Enter today's steps")}
               keyboardType="numeric"
               value={stepDraft}
               onChangeText={setStepDraft}
               containerStyle={styles.flex}
             />
             <Pressable onPress={saveSteps} style={[styles.stepSave, { backgroundColor: theme.primary }]}>
-              <Text style={[styles.stepSaveText, { color: palette.white }]}>Save</Text>
+              <Text style={[styles.stepSaveText, { color: palette.white }]}>{t('Save')}</Text>
             </Pressable>
           </View>
           <Text style={[styles.stepNote, { color: palette.textFaint }]}>
-            Apple Health & Google Health Connect coming later ✨
+            {t('Apple Health & Google Health Connect coming later ✨')}
           </Text>
         </RoundedCard>
 
         {/* Performance */}
-        <SectionTitle title="Today's Performance" />
+        <SectionTitle title={t("Today's Performance")} />
         <RoundedCard style={styles.performanceCard}>
           <ProgressRing
             progress={score / 100}
@@ -411,18 +416,18 @@ export default function SelfLoveScreen() {
           />
           <View style={styles.performanceInfo}>
             <Text style={[styles.tierLabel, { color: theme.accent }]}>
-              {tier.emoji} {tier.label}
+              {tier.emoji} {t(tier.label)}
             </Text>
             <Text style={[styles.tierSub, { color: palette.textSecondary }]}>
-              Every little thing you did today counts.
+              {t('Every little thing you did today counts.')}
             </Text>
           </View>
         </RoundedCard>
 
         {/* Food diary */}
         <SectionTitle
-          title="Food Diary"
-          actionLabel="+ Add Meal"
+          title={t('Food Diary')}
+          actionLabel={t('+ Add Meal')}
           onAction={() => {
             setEditingMeal(null);
             setMealModalOpen(true);
@@ -431,9 +436,9 @@ export default function SelfLoveScreen() {
         {meals.length === 0 ? (
           <EmptyState
             emoji="🍓"
-            title="Nothing logged yet"
-            subtitle="Your tummy deserves a spotlight. Add your first meal!"
-            actionLabel="+ Add Meal"
+            title={t('Nothing logged yet')}
+            subtitle={t('Your tummy deserves a spotlight. Add your first meal!')}
+            actionLabel={t('+ Add Meal')}
             onAction={() => setMealModalOpen(true)}
           />
         ) : (
@@ -469,7 +474,7 @@ export default function SelfLoveScreen() {
                     {meal.meal_name}
                   </Text>
                   <Text style={[styles.diaryMeta, { color: palette.textSecondary }]}>
-                    {mealMeta(meal.meal_type).label} · {shortTime(meal.meal_time)}
+                    {t(mealMeta(meal.meal_type).label)} · {shortTime(meal.meal_time)}
                     {meal.notes ? ` · ${meal.notes}` : ''}
                   </Text>
                 </View>
@@ -480,7 +485,7 @@ export default function SelfLoveScreen() {
               </Pressable>
             ))}
             <View style={[styles.diaryTotalRow, { backgroundColor: theme.light }]}>
-              <Text style={[styles.diaryTotalLabel, { color: theme.accent }]}>Today's Total</Text>
+              <Text style={[styles.diaryTotalLabel, { color: theme.accent }]}>{t("Today's Total")}</Text>
               <Text style={[styles.diaryTotalValue, { color: theme.accent }]}>
                 {formatNumber(calories)} / {formatNumber(smartGoal)} kcal
               </Text>
@@ -489,7 +494,7 @@ export default function SelfLoveScreen() {
         )}
 
         {/* Group progress */}
-        <SectionTitle title="Our Group Progress" />
+        <SectionTitle title={t('Our Group Progress')} />
         <RoundedCard style={styles.groupCard} tinted>
           <Text style={[styles.groupScore, { color: theme.accent }]}>{groupAverage}%</Text>
           <View style={styles.groupRow}>
@@ -504,8 +509,8 @@ export default function SelfLoveScreen() {
           </View>
           <Text style={[styles.groupMessage, { color: palette.textSecondary }]}>
             {groupAverage >= 70
-              ? "We're doing great today! ✨"
-              : 'Growing together, one small step at a time 🌿'}
+              ? t("We're doing great today! ✨")
+              : t('Growing together, one small step at a time 🌿')}
           </Text>
         </RoundedCard>
 

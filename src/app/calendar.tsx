@@ -17,6 +17,7 @@ import { LoadingView } from '@/components/LoadingView';
 import { RoundedCard } from '@/components/RoundedCard';
 import { Screen } from '@/components/Screen';
 import { RADIUS, mealMeta, moodMeta, useAppTheme } from '@/core/theme';
+import { useI18n } from '@/core/i18n';
 import { formatNumber, monthYear, shortTime, todayKey } from '@/core/utils/date';
 import type { Activity, Profile } from '@/models';
 import { fetchHistoryRange, type DayHistory } from '@/repositories/history';
@@ -31,6 +32,7 @@ import { useAuth } from '@/features/auth/SessionProvider';
 export default function CalendarScreen() {
   const { profile } = useAuth();
   const { theme, palette } = useAppTheme();
+  const { t, language } = useI18n();
   const router = useRouter();
 
   const [monthOffset, setMonthOffset] = useState(0); // 0 = current month
@@ -62,9 +64,9 @@ export default function CalendarScreen() {
       lastKey: key(last),
       daysInMonth: last.getDate(),
       firstWeekday: first.getDay(), // 0 = Sunday
-      label: monthYear(first),
+      label: monthYear(first, language),
     };
-  }, [monthOffset]);
+  }, [monthOffset, language]);
 
   const load = useCallback(async () => {
     if (!profile) return;
@@ -78,7 +80,7 @@ export default function CalendarScreen() {
       setActivitiesByDay(range.activitiesByDay);
       setProfiles(allProfiles);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not open the calendar.');
+      setError(e instanceof Error ? e.message : t('Could not open the calendar.'));
     } finally {
       setLoading(false);
     }
@@ -108,7 +110,7 @@ export default function CalendarScreen() {
 
   const isFuture = (key: string) => key > todayKey();
 
-  if (loading && !history) return <LoadingView label="Unfolding the calendar…" />;
+  if (loading && !history) return <LoadingView label={t('Unfolding the calendar…')} />;
   if (error && !history) return <ErrorState message={error} onRetry={load} />;
   if (!profile) return null;
 
@@ -239,8 +241,8 @@ export default function CalendarScreen() {
         {!selectedDay || selectedDay.activityCount === 0 ? (
           <EmptyState
             emoji="🌙"
-            title="A quiet day"
-            subtitle="Nothing was logged this day — and that's okay."
+            title={t('A quiet day')}
+            subtitle={t("Nothing was logged this day — and that's okay.")}
           />
         ) : (
           <>
@@ -316,7 +318,7 @@ export default function CalendarScreen() {
                             {meal.meal_name}
                           </Text>
                           <Text style={[styles.mealMeta, { color: palette.textFaint }]}>
-                            {mealMeta(meal.meal_type).label} · {shortTime(meal.meal_time)}
+                            {t(mealMeta(meal.meal_type).label)} · {shortTime(meal.meal_time)}
                           </Text>
                           {/* Component breakdown from the photo analysis */}
                           {meal.components && meal.components.length > 0 ? (

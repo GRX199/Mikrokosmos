@@ -8,6 +8,8 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { SessionProvider, useAuth } from '@/features/auth/SessionProvider';
 import { ThemeProvider, useAppTheme } from '@/core/theme';
+import { I18nProvider } from '@/core/i18n/I18nProvider';
+import { AppearanceProvider, useAppearanceMode } from '@/core/appearance/AppearanceProvider';
 import { LoadingView } from '@/components/LoadingView';
 
 SplashScreen.preventAutoHideAsync();
@@ -15,16 +17,21 @@ SplashScreen.preventAutoHideAsync();
 /**
  * Root layout:
  *  - SessionProvider decides WHO is inside the universe.
- *  - ThemeProvider re-skins the whole app from that member's theme.
+ *  - I18nProvider + AppearanceProvider are device-level settings.
+ *  - ThemeProvider re-skins the whole app from member theme + mode.
  *  - Auth redirects live in the screens themselves (expo-router pattern).
  */
 export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <SessionProvider>
-          <RootNavigator />
-        </SessionProvider>
+        <I18nProvider>
+          <AppearanceProvider>
+            <SessionProvider>
+              <RootNavigator />
+            </SessionProvider>
+          </AppearanceProvider>
+        </I18nProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
@@ -45,18 +52,20 @@ function RootNavigator() {
 }
 
 function AppStack({ ready }: { ready: boolean }) {
-  const { theme } = useAppTheme();
+  const { theme, palette } = useAppTheme();
+  const { mode } = useAppearanceMode();
   if (!ready) return <LoadingView />;
+
   return (
     <NavigationThemeProvider
       value={{
-        dark: false,
+        dark: mode === 'dark',
         colors: {
           primary: theme.primary,
           background: theme.background,
-          card: '#FFFFFF',
-          text: '#2E2A3B',
-          border: '#F0ECF7',
+          card: palette.card,
+          text: palette.text,
+          border: palette.border,
           notification: theme.primary,
         },
         fonts: {
@@ -67,7 +76,7 @@ function AppStack({ ready }: { ready: boolean }) {
         },
       }}
     >
-      <StatusBar style="dark" />
+      <StatusBar style={mode === 'dark' ? 'light' : 'dark'} />
       <Stack
         screenOptions={{
           headerShown: false,

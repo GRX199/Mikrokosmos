@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { SoftInput } from '@/components/SoftInput';
 import { MAX_CONTENT_WIDTH, RADIUS, useAppTheme } from '@/core/theme';
+import { useI18n } from '@/core/i18n';
 import { useAuth } from '@/features/auth/SessionProvider';
 
 /**
@@ -24,6 +25,7 @@ import { useAuth } from '@/features/auth/SessionProvider';
 export default function LoginScreen() {
   const { profile, signIn, isMock } = useAuth();
   const { theme, palette } = useAppTheme();
+  const { t } = useI18n();
   const insets = useSafeAreaInsets();
 
   const [username, setUsername] = useState('');
@@ -63,15 +65,15 @@ export default function LoginScreen() {
               <Text style={styles.logoEmoji}>🌌</Text>
             </View>
 
-            <Text style={[styles.title, { color: palette.text }]}>Welcome to Mikrokosmos</Text>
+            <Text style={[styles.title, { color: palette.text }]}>{t('Welcome to Mikrokosmos')}</Text>
             <Text style={[styles.subtitle, { color: palette.textSecondary }]}>
-              Our little universe.
+              {t('Our little universe.')}
             </Text>
 
             {/* Form */}
             <View style={styles.form}>
               <SoftInput
-                placeholder="Username"
+                placeholder={t('Username')}
                 autoCapitalize="none"
                 autoCorrect={false}
                 value={username}
@@ -80,7 +82,7 @@ export default function LoginScreen() {
               />
               <View style={styles.passwordRow}>
                 <SoftInput
-                  placeholder="Password"
+                  placeholder={t('Password')}
                   secureTextEntry={!showPassword}
                   value={password}
                   onChangeText={setPassword}
@@ -91,7 +93,7 @@ export default function LoginScreen() {
                 <Pressable
                   onPress={() => setShowPassword((v) => !v)}
                   style={[styles.eyeButton, { backgroundColor: theme.light }]}
-                  accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+                  accessibilityLabel={showPassword ? t('Hide password') : t('Show password')}
                 >
                   <Ionicons
                     name={showPassword ? 'eye-off-outline' : 'eye-outline'}
@@ -108,7 +110,7 @@ export default function LoginScreen() {
               ) : null}
 
               <PrimaryButton
-                label="Enter Mikrokosmos ✨"
+                label={t('Enter Mikrokosmos ✨')}
                 onPress={handleLogin}
                 loading={submitting}
                 style={styles.loginButton}
@@ -116,13 +118,13 @@ export default function LoginScreen() {
 
               {isMock ? (
                 <Text style={[styles.mockNote, { color: palette.textFaint }]}>
-                  Offline preview — sign in as namnamxyi, kyraawr or xcjessyx with any password.
+                  {t('Offline preview — sign in as namnamxyi, kyraawr or xcjessyx with any password.')}
                 </Text>
               ) : null}
             </View>
 
             <Text style={[styles.tagline, { color: palette.textFaint }]}>
-              A little universe shared by three best friends 💫
+              {t('A little universe shared by three best friends 💫')}
             </Text>
           </View>
         </ScrollView>

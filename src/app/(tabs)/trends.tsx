@@ -21,6 +21,7 @@ import { RoundedCard } from '@/components/RoundedCard';
 import { Screen } from '@/components/Screen';
 import { SoftInput } from '@/components/SoftInput';
 import { RADIUS, trendStatusMeta, TREND_STATUSES, useAppTheme } from '@/core/theme';
+import { useI18n } from '@/core/i18n';
 import type { Profile, Trend, TrendStatus } from '@/models';
 import { fetchProfiles } from '@/repositories/profiles';
 import {
@@ -50,6 +51,7 @@ export default function TrendsScreen() {
   const router = useRouter();
   const { profile } = useAuth();
   const { theme, palette } = useAppTheme();
+  const { t } = useI18n();
 
   const [trends, setTrends] = useState<Trend[]>([]);
   const [participants, setParticipants] = useState<Record<string, string[]>>({});
@@ -70,7 +72,7 @@ export default function TrendsScreen() {
       for (const p of profiles) map[p.id] = p;
       setProfileMap(map);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not load trends.');
+      setError(e instanceof Error ? e.message : t('Could not load trends.'));
     } finally {
       setLoading(false);
     }
@@ -82,7 +84,7 @@ export default function TrendsScreen() {
     return unsubscribe;
   }, [load]);
 
-  if (loading && trends.length === 0) return <LoadingView label="Gathering the fun list…" />;
+  if (loading && trends.length === 0) return <LoadingView label={t('Gathering the fun list…')} />;
   if (error && trends.length === 0) return <ErrorState message={error} onRetry={load} />;
 
   const filtered = tab === 'all' ? trends : trends.filter((t) => t.status === tab);
@@ -140,7 +142,7 @@ export default function TrendsScreen() {
                 <Text
                   style={[styles.tabLabel, { color: active ? palette.white : palette.textSecondary }]}
                 >
-                  {key === 'all' ? 'All' : `${meta!.emoji} ${meta!.label}`}
+                  {key === 'all' ? t('All') : `${meta!.emoji} ${t(meta!.label)}`}
                 </Text>
               </Pressable>
             );
@@ -150,9 +152,9 @@ export default function TrendsScreen() {
         {filtered.length === 0 ? (
           <EmptyState
             emoji="✨"
-            title="No trends yet"
-            subtitle={'Found something fun on TikTok?\nSave it here so you don\'t forget.'}
-            actionLabel="+ Add Trend"
+            title={t('No trends yet')}
+            subtitle={t("Found something fun on TikTok?\nSave it here so you don't forget.")}
+            actionLabel={t('+ Add Trend')}
             onAction={() => setAddOpen(true)}
           />
         ) : (
@@ -261,6 +263,7 @@ function AddTrendModal({
   }) => Promise<void>;
 }) {
   const { theme, palette } = useAppTheme();
+  const { t } = useI18n();
   const [title, setTitle] = useState('');
   const [url, setUrl] = useState('');
   const [description, setDescription] = useState('');
@@ -306,16 +309,16 @@ function AddTrendModal({
       <Pressable style={[styles.backdrop, { backgroundColor: palette.overlay }]} onPress={onClose}>
         <Pressable onPress={() => {}} style={styles.sheetAnchor}>
           <RoundedCard style={styles.sheet}>
-            <Text style={[styles.sheetTitle, { color: palette.text }]}>New Trend ✨</Text>
+            <Text style={[styles.sheetTitle, { color: palette.text }]}>{t('New Trend ✨')}</Text>
 
             <SoftInput
-              placeholder="Trend title"
+              placeholder={t('Trend title')}
               value={title}
               onChangeText={setTitle}
               containerStyle={styles.field}
             />
             <SoftInput
-              placeholder="Link (TikTok / Instagram / YouTube…)"
+              placeholder={t('Link (TikTok / Instagram / YouTube…)')}
               value={url}
               autoCapitalize="none"
               onChangeText={(text) => {
@@ -326,25 +329,25 @@ function AddTrendModal({
             />
             {urlError ? (
               <Text style={[styles.fieldError, { color: palette.danger }]}>
-                That link doesn't look right — it should start with https://
+                {t("That link doesn't look right — it should start with https://")}
               </Text>
             ) : null}
             <SoftInput
-              placeholder="Description (optional)"
+              placeholder={t('Description (optional)')}
               value={description}
               onChangeText={setDescription}
               multiline
               containerStyle={styles.field}
             />
             <SoftInput
-              placeholder="Target date (YYYY-MM-DD, optional)"
+              placeholder={t('Target date (YYYY-MM-DD, optional)')}
               value={targetDate}
               onChangeText={setTargetDate}
               containerStyle={styles.field}
             />
 
             <Text style={[styles.participantsLabel, { color: palette.textSecondary }]}>
-              Who's in?
+              {t("Who's in?")}
             </Text>
             <View style={styles.participantSelectRow}>
               {profiles.map((p) => {
@@ -375,7 +378,7 @@ function AddTrendModal({
             </View>
 
             <PrimaryButton
-              label="Add Trend ✨"
+              label={t('Add Trend ✨')}
               onPress={handleCreate}
               disabled={!title.trim()}
               loading={saving}

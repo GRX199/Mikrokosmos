@@ -2,6 +2,7 @@ import { Redirect, Tabs } from 'expo-router';
 
 import { CosmicTabBar } from '@/components/CosmicTabBar';
 import { useAuth } from '@/features/auth/SessionProvider';
+import { useI18n } from '@/core/i18n';
 
 /**
  * The five rooms of the universe (spec section 5):

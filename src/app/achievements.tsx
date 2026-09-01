@@ -15,6 +15,7 @@ import { LoadingView } from '@/components/LoadingView';
 import { RoundedCard } from '@/components/RoundedCard';
 import { Screen } from '@/components/Screen';
 import { RADIUS, useAppTheme } from '@/core/theme';
+import { useI18n } from '@/core/i18n';
 import type { Profile } from '@/models';
 import {
   ACHIEVEMENTS,
@@ -34,6 +35,7 @@ import { useAuth } from '@/features/auth/SessionProvider';
 export default function AchievementsScreen() {
   const { profile } = useAuth();
   const { theme, palette } = useAppTheme();
+  const { t } = useI18n();
   const router = useRouter();
 
   const [myStats, setMyStats] = useState<AchievementStats | null>(null);
@@ -57,7 +59,7 @@ export default function AchievementsScreen() {
       );
       setFriendStats(Object.fromEntries(others));
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not load the badge shelf.');
+      setError(e instanceof Error ? e.message : t('Could not load the badge shelf.'));
     } finally {
       setLoading(false);
     }
@@ -72,7 +74,7 @@ export default function AchievementsScreen() {
     [myStats]
   );
 
-  if (loading && !myStats) return <LoadingView label="Polishing the badges…" />;
+  if (loading && !myStats) return <LoadingView label={t('Polishing the badges…')} />;
   if (error && !myStats) return <ErrorState message={error} onRetry={load} />;
   if (!profile || !myStats) return null;
 
@@ -148,8 +150,8 @@ export default function AchievementsScreen() {
         {friends.length === 0 ? (
           <EmptyState
             emoji="🌌"
-            title="Just you so far"
-            subtitle="When your friends join, their badges will shine here too."
+            title={t('Just you so far')}
+            subtitle={t('When your friends join, their badges will shine here too.')}
           />
         ) : (
           friends.map((friend) => {

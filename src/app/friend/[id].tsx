@@ -11,6 +11,7 @@ import { RoundedCard } from '@/components/RoundedCard';
 import { Screen } from '@/components/Screen';
 import { SectionTitle } from '@/components/SectionTitle';
 import { themeFor, moodMeta, mealMeta, performanceTier, RADIUS, useAppTheme } from '@/core/theme';
+import { useI18n } from '@/core/i18n';
 import { formatNumber, shortTime, todayKey } from '@/core/utils/date';
 import type { DailyCheckin, Meal, PrivacySettings, Profile } from '@/models';
 import { fetchCheckin, fetchUserCheckins } from '@/repositories/checkins';
@@ -25,6 +26,7 @@ export default function FriendScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { palette } = useAppTheme();
+  const { t } = useI18n();
 
   const [friend, setFriend] = useState<Profile | null>(null);
   const [checkin, setCheckin] = useState<DailyCheckin | null>(null);
@@ -76,7 +78,7 @@ export default function FriendScreen() {
         })
       );
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not open this profile.');
+      setError(e instanceof Error ? e.message : t('Could not open this profile.'));
     } finally {
       setLoading(false);
     }
@@ -86,7 +88,7 @@ export default function FriendScreen() {
     load();
   }, [load]);
 
-  if (loading) return <LoadingView label="Visiting your friend…" />;
+  if (loading) return <LoadingView label={t('Visiting your friend…')} />;
   if (error || !friend) return <ErrorState message={error ?? undefined} onRetry={() => router.back()} />;
 
   const friendTheme = themeFor(friend.theme);
@@ -126,7 +128,7 @@ export default function FriendScreen() {
         </RoundedCard>
 
         {/* Today */}
-        <SectionTitle title="Today" />
+        <SectionTitle title={t('Today')} />
         <RoundedCard>
           <View style={styles.todayRow}>
             <View style={styles.todayItem}>
@@ -139,15 +141,15 @@ export default function FriendScreen() {
             <View style={styles.todayItem}>
               <Text style={styles.todayEmoji}>{checkin ? moodMeta(checkin.mood).emoji : '🌙'}</Text>
               <Text style={[styles.todayValue, { color: palette.text }]}>
-                {checkin ? moodMeta(checkin.mood).label : 'Not yet'}
+                {checkin ? t(moodMeta(checkin.mood).label) : t('Not yet')}
               </Text>
-              <Text style={[styles.todayLabel, { color: palette.textSecondary }]}>Mood</Text>
+              <Text style={[styles.todayLabel, { color: palette.textSecondary }]}>{t('Mood')}</Text>
             </View>
             <View style={styles.todayItem}>
               <Text style={styles.todayEmoji}>{tier?.emoji ?? '🌱'}</Text>
               <Text style={[styles.todayValue, { color: palette.text }]}>{score ?? 0}%</Text>
               <Text style={[styles.todayLabel, { color: palette.textSecondary }]}>
-                {tier?.label ?? 'Starting'}
+                {tier ? t(tier.label) : t('Starting')}
               </Text>
             </View>
           </View>
@@ -159,7 +161,7 @@ export default function FriendScreen() {
         </RoundedCard>
 
         {/* Progress rings */}
-        <SectionTitle title="Progress" />
+        <SectionTitle title={t('Progress')} />
         <RoundedCard>
           <View style={styles.ringRow}>
             <View style={styles.ringItem}>
@@ -177,7 +179,7 @@ export default function FriendScreen() {
                 progress={Math.min(1, water / 8)}
                 size={74}
                 label={`${water}`}
-                sublabel="glasses"
+                sublabel={t('glasses')}
                 color={friendTheme.primary}
               />
               <Text style={[styles.ringLabel, { color: palette.textSecondary }]}>Water</Text>
@@ -187,7 +189,7 @@ export default function FriendScreen() {
                 progress={Math.min(1, steps / 8000)}
                 size={74}
                 label={formatNumber(steps)}
-                sublabel="steps"
+                sublabel={t('steps')}
                 color={friendTheme.primary}
               />
               <Text style={[styles.ringLabel, { color: palette.textSecondary }]}>Steps</Text>
@@ -196,7 +198,7 @@ export default function FriendScreen() {
         </RoundedCard>
 
         {/* Meals — hidden entirely when privacy says Only Me */}
-        <SectionTitle title="Meals" />
+        <SectionTitle title={t('Meals')} />
         {mealsVisible ? (
           meals.length === 0 ? (
             <RoundedCard>
@@ -211,7 +213,7 @@ export default function FriendScreen() {
                 <View style={styles.mealTextWrap}>
                   <Text style={[styles.mealName, { color: palette.text }]}>{meal.meal_name}</Text>
                   <Text style={[styles.mealMetaText, { color: palette.textFaint }]}>
-                    {mealMeta(meal.meal_type).label} · {shortTime(meal.meal_time)}
+                    {t(mealMeta(meal.meal_type).label)} · {shortTime(meal.meal_time)}
                   </Text>
                 </View>
                 {caloriesVisible && meal.calories != null ? (

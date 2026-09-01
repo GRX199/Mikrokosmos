@@ -5,6 +5,7 @@ import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MAX_CONTENT_WIDTH, RADIUS, useAppTheme } from '@/core/theme';
+import { useI18n } from '@/core/i18n';
 import { subscribeToUnread } from '@/stores/unreadChatStore';
 
 const TAB_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
@@ -21,6 +22,7 @@ const TAB_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
  */
 export function CosmicTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const { theme, palette } = useAppTheme();
+  const { t } = useI18n();
   const insets = useSafeAreaInsets();
   const [unreadCount, setUnreadCount] = useState(0);
 
@@ -43,7 +45,7 @@ export function CosmicTabBar({ state, descriptors, navigation }: BottomTabBarPro
       >
         {state.routes.map((route, index) => {
           const { options } = descriptors[route.key];
-          const label = options.title ?? route.name;
+          const label = t(options.title ?? route.name);
           const focused = state.index === index;
           const icon = TAB_ICONS[route.name] ?? 'ellipse';
 
