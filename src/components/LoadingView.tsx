@@ -2,11 +2,14 @@ import React, { useEffect, useRef } from 'react';
 import { ActivityIndicator, Animated, Platform, StyleSheet, Text, View } from 'react-native';
 
 import { useAppTheme } from '@/core/theme';
+import { useI18n } from '@/core/i18n';
 import { PrimaryButton } from './PrimaryButton';
 
 /** Soft pulsing loader — never a blank page (spec section 45). */
-export function LoadingView({ label = 'Opening your universe…' }: { label?: string }) {
+export function LoadingView({ label }: { label?: string }) {
   const { theme, palette } = useAppTheme();
+  const { t } = useI18n();
+  const resolved = label ?? t('Opening your universe…');
   const pulse = useRef(new Animated.Value(0.4)).current;
 
   useEffect(() => {
@@ -31,7 +34,7 @@ export function LoadingView({ label = 'Opening your universe…' }: { label?: st
         ]}
       />
       <ActivityIndicator color={theme.accent} style={styles.spinner} />
-      <Text style={[styles.label, { color: palette.textSecondary }]}>{label}</Text>
+      <Text style={[styles.label, { color: palette.textSecondary }]}>{resolved}</Text>
     </View>
   );
 }
@@ -45,14 +48,15 @@ export function ErrorState({
   onRetry?: () => void;
 }) {
   const { palette } = useAppTheme();
+  const { t } = useI18n();
   return (
     <View style={styles.wrap}>
       <Text style={styles.emoji}>🛰️</Text>
-      <Text style={[styles.title, { color: palette.text }]}>Signal lost</Text>
+      <Text style={[styles.title, { color: palette.text }]}>{t('Signal lost')}</Text>
       <Text style={[styles.message, { color: palette.textSecondary }]}>
-        {message ?? 'Something drifted out of orbit. Try again?'}
+        {message ?? t('Something drifted out of orbit. Try again?')}
       </Text>
-      {onRetry ? <PrimaryButton label="Try again" onPress={onRetry} variant="soft" /> : null}
+      {onRetry ? <PrimaryButton label={t('Try again')} onPress={onRetry} variant="soft" /> : null}
     </View>
   );
 }

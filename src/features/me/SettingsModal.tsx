@@ -132,6 +132,9 @@ export function SettingsModal({
                 {t('System default')}
               </Text>
             )}
+            <Text style={[styles.hint, { color: palette.textFaint }]}>
+              {t('Saved per account')}
+            </Text>
           </RoundedCard>
         </Pressable>
       </Pressable>

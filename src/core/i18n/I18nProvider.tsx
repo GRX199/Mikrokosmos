@@ -1,12 +1,13 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, {
   createContext,
-  useCallback,
   useContext,
   useEffect,
   useMemo,
   useState,
 } from 'react';
+
+import { accountKey, onSessionUsernameChange } from '@/core/session/bridge';
 
 /**
  * Tiny i18n — English strings are the keys; the ID dictionary maps
@@ -18,6 +19,9 @@ import React, {
 export type AppLanguage = 'en' | 'id';
 
 const STORAGE_KEY = 'mikrokosmos.language';
+
+/** App default language — Bahasa Indonesia. */
+export const DEFAULT_LANGUAGE: AppLanguage = 'id';
 
 /** Indonesian translations. English = the key itself. */
 const ID: Record<string, string> = {
@@ -353,12 +357,33 @@ const ID: Record<string, string> = {
   'System default': 'Bawaan sistem',
   'App Language & Theme': 'Bahasa & Tema Aplikasi',
   'Choose your vibe': 'Pilih suasana yang kamu suka',
+  'Saved per account': 'Tersimpan untuk akun ini',
 
   // ── Friend profile ─────────────────────────────────────────────
   'You': 'Kamu',
 
   // ── Mood / meal / status labels (colors.ts) ────────────────────
   'Seedling': 'Tunas',
+
+  // ── Modals: morning check-in / meals / body ────────────────────
+  'Good morning': 'Selamat pagi',
+  'What time did you wake up today?': 'Jam berapa kamu bangun tadi?',
+  'How are you feeling today?': 'Bagaimana perasaanmu hari ini?',
+  'Start My Day ✨': 'Mulai Hariku ✨',
+  'Calories (optional)': 'Kalori (opsional)',
+  'Notes (optional)': 'Catatan (opsional)',
+  'Save Meal 💗': 'Simpan Makanan 💗',
+  '✨ Estimate calories': '✨ Perkiraan kalori',
+  'No match found — try a different name or add a photo.':
+    'Tidak ditemukan — coba nama lain atau tambahkan foto.',
+  'Estimates may vary. Food is fuel and joy — no judgment here.':
+    'Perkiraan bisa berbeda. Makanan adalah energi dan kebahagiaan — tanpa menghakimi.',
+  'Height (cm)': 'Tinggi (cm)',
+  'Weight (kg)': 'Berat (kg)',
+  'Save My Body 💗': 'Simpan Tubuhku 💗',
+  'Something drifted out of orbit. Try again?': 'Ada yang keluar dari orbit. Coba lagi?',
+  'You choose what your friends can see. Everything else stays just yours.':
+    'Kamu yang memilih apa yang bisa dilihat teman-teman. Sisanya tetap milikmu sendiri.',
 };
 
 export interface I18nContextValue {
@@ -369,33 +394,49 @@ export interface I18nContextValue {
 }
 
 const I18nContext = createContext<I18nContextValue>({
-  language: 'en',
+  language: DEFAULT_LANGUAGE,
   t: (k) => k,
   setLanguage: () => undefined,
 });
 
 export function I18nProvider({ children }: { children: React.ReactNode }) {
-  const [language, setLanguageState] = useState<AppLanguage>('en');
+  const [language, setLanguageState] = useState<AppLanguage>(DEFAULT_LANGUAGE);
 
-  // Restore the saved language on mount (AsyncStorage on native,
-  // localStorage on web).
+  // Load the signed-in account's saved language (per-account storage key).
+  // Re-runs whenever the session changes (login/logout/account switch).
   useEffect(() => {
-    AsyncStorage.getItem(STORAGE_KEY)
+    let active = true;
+    const key = accountKey(STORAGE_KEY);
+    AsyncStorage.getItem(key)
       .then((saved) => {
-        if (saved === 'id' || saved === 'en') setLanguageState(saved);
+        if (active && (saved === 'id' || saved === 'en')) {
+          setLanguageState(saved);
+        } else if (active) {
+          // No explicit choice for this account yet → app default.
+          setLanguageState(DEFAULT_LANGUAGE);
+        }
       })
       .catch(() => undefined);
+    const off = onSessionUsernameChange(() => {
+      // username flipped → accountKey() now resolves to the new account's key
+      AsyncStorage.getItem(accountKey(STORAGE_KEY))
+        .then((saved) => {
+          if (active) setLanguageState(saved === 'id' || saved === 'en' ? saved : DEFAULT_LANGUAGE);
+        })
+        .catch(() => undefined);
+    });
+    return () => {
+      active = false;
+      off();
+    };
   }, []);
 
-  const setLanguage = useCallback((lang: AppLanguage) => {
+  const setLanguage = (lang: AppLanguage) => {
     setLanguageState(lang);
-    AsyncStorage.setItem(STORAGE_KEY, lang).catch(() => undefined);
-  }, []);
+    AsyncStorage.setItem(accountKey(STORAGE_KEY), lang).catch(() => undefined);
+  };
 
-  const t = useCallback(
-    (key: string) => (language === 'id' ? ID[key] ?? key : key),
-    [language]
-  );
+  const t = (key: string) => (language === 'id' ? ID[key] ?? key : key);
 
   const value = useMemo(
     () => ({ language, t, setLanguage }),
@@ -416,4 +457,7 @@ export function useI18n() {
 
 
 
-
+
+
+
+

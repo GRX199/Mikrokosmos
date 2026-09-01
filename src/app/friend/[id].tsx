@@ -182,7 +182,7 @@ export default function FriendScreen() {
                 sublabel={t('glasses')}
                 color={friendTheme.primary}
               />
-              <Text style={[styles.ringLabel, { color: palette.textSecondary }]}>Water</Text>
+              <Text style={[styles.ringLabel, { color: palette.textSecondary }]}>{t('Water')}</Text>
             </View>
             <View style={styles.ringItem}>
               <ProgressRing
@@ -192,7 +192,7 @@ export default function FriendScreen() {
                 sublabel={t('steps')}
                 color={friendTheme.primary}
               />
-              <Text style={[styles.ringLabel, { color: palette.textSecondary }]}>Steps</Text>
+              <Text style={[styles.ringLabel, { color: palette.textSecondary }]}>{t('Steps')}</Text>
             </View>
           </View>
         </RoundedCard>

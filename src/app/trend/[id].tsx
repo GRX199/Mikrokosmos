@@ -362,7 +362,7 @@ export default function TrendDetailScreen() {
             </Text>
             <PrimaryButton label={t('Save Memory 💌')} onPress={handleSaveMemory} />
             <Pressable onPress={() => setCelebrate(false)} style={styles.laterButton}>
-              <Text style={[styles.laterText, { color: palette.textSecondary }]}>Maybe Later</Text>
+              <Text style={[styles.laterText, { color: palette.textSecondary }]}>{t('Maybe Later')}</Text>
             </Pressable>
           </View>
         </View>

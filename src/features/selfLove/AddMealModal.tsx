@@ -15,6 +15,7 @@ import { PrimaryButton } from '@/components/PrimaryButton';
 import { RoundedCard } from '@/components/RoundedCard';
 import { SoftInput } from '@/components/SoftInput';
 import { MEAL_TYPES, RADIUS, useAppTheme } from '@/core/theme';
+import { useI18n } from '@/core/i18n';
 import { nowTime } from '@/core/utils/date';
 import type { Meal, MealComponent, MealType } from '@/models';
 import type { MealInput } from '@/repositories/meals';
@@ -37,6 +38,7 @@ export function AddMealModal({
   onSave: (input: MealInput, localImageUri: string | null) => Promise<void>;
 }) {
   const { theme, palette } = useAppTheme();
+  const { t } = useI18n();
 
   const [mealType, setMealType] = useState<MealType>('breakfast');
   const [name, setName] = useState('');
@@ -101,7 +103,7 @@ export function AddMealModal({
         setName(result.mealName);
         setCalories(String(result.totalCalories));
       } else {
-        setNameHint('Photo analysis unavailable right now. Try typing the food name instead! 🍽️');
+        setNameHint(t('Photo analysis unavailable right now. Try typing the food name instead! 🍽️'));
       }
     } finally {
       setAnalyzing(false);
@@ -118,7 +120,7 @@ export function AddMealModal({
         setAnalysis(result);
         setCalories(String(result.totalCalories));
       } else {
-        setNameHint('No match found — try a different name or add a photo.');
+        setNameHint(t('No match found — try a different name or add a photo.'));
       }
     } finally {
       setAnalyzing(false);
@@ -199,7 +201,7 @@ export function AddMealModal({
                           { color: selected ? palette.white : palette.text },
                         ]}
                       >
-                        {option.label}
+                        {t(option.label)}
                       </Text>
                     </Pressable>
                   );
@@ -217,20 +219,20 @@ export function AddMealModal({
                   >
                     <Ionicons name="camera-outline" size={26} color={theme.accent} />
                     <Text style={[styles.photoPlaceholderText, { color: theme.accent }]}>
-                      Add photo
+                      {t('Add photo')}
                     </Text>
                   </Pressable>
                 )}
                 <View style={styles.photoActions}>
                   <PrimaryButton
-                    label={imageUri ? 'Change photo' : 'Pick a photo'}
+                    label={imageUri ? t('Change photo') : t('Pick a photo')}
                     onPress={pickPhoto}
                     variant="soft"
                     style={styles.photoButton}
                   />
                   {imageUri ? (
                     <PrimaryButton
-                      label={analyzing ? 'Analyzing…' : '✨ Estimate calories'}
+                      label={analyzing ? t('Analyzing…') : t('✨ Estimate calories')}
                       onPress={runAnalysis}
                       loading={analyzing}
                       style={styles.photoButton}
@@ -261,7 +263,7 @@ export function AddMealModal({
               {/* Fields */}
               <View style={styles.nameRow}>
                 <SoftInput
-                  placeholder="Meal name"
+                  placeholder={t('Meal name')}
                   value={name}
                   onChangeText={(t) => { setName(t); setAnalysis(null); setNameHint(null); }}
                   containerStyle={styles.nameInput}
@@ -278,14 +280,14 @@ export function AddMealModal({
                 <Text style={[styles.nameHint, { color: palette.textFaint }]}>{nameHint}</Text>
               ) : null}
               <SoftInput
-                placeholder="Calories (optional)"
+                placeholder={t('Calories (optional)')}
                 value={calories}
                 onChangeText={(text) => setCalories(text.replace(/[^0-9]/g, ''))}
                 keyboardType="numeric"
                 containerStyle={styles.field}
               />
               <SoftInput
-                placeholder="Notes (optional)"
+                placeholder={t('Notes (optional)')}
                 value={notes}
                 onChangeText={setNotes}
                 containerStyle={styles.field}
@@ -303,7 +305,7 @@ export function AddMealModal({
               </View>
 
               <PrimaryButton
-                label={initial ? 'Save changes' : 'Save Meal 💗'}
+                label={initial ? t('Save changes') : t('Save Meal 💗')}
                 onPress={handleSave}
                 disabled={!name.trim()}
                 loading={saving}

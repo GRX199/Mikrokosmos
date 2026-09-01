@@ -13,6 +13,7 @@ import { PrimaryButton } from '@/components/PrimaryButton';
 import { RoundedCard } from '@/components/RoundedCard';
 import { SoftInput } from '@/components/SoftInput';
 import { RADIUS, useAppTheme } from '@/core/theme';
+import { useI18n } from '@/core/i18n';
 import type { ActivityLevel, BodyMetrics, Sex, WeightGoal } from '@/models';
 import { computeBodyInsights } from '@/services/bodyInsights';
 
@@ -49,6 +50,7 @@ export function BodyMetricsModal({
   onSave: (patch: Partial<Omit<BodyMetrics, 'user_id'>>) => Promise<void>;
 }) {
   const { theme, palette } = useAppTheme();
+  const { t } = useI18n();
 
   const [height, setHeight] = useState('');
   const [weight, setWeight] = useState('');
@@ -116,21 +118,21 @@ export function BodyMetricsModal({
             <ScrollView showsVerticalScrollIndicator={false} style={styles.body}>
               {/* Numbers */}
               <SoftInput
-                placeholder="Height (cm)"
+                placeholder={t('Height (cm)')}
                 value={height}
                 onChangeText={(t) => setHeight(t.replace(/[^0-9.]/g, ''))}
                 keyboardType="numeric"
                 containerStyle={styles.field}
               />
               <SoftInput
-                placeholder="Weight (kg)"
+                placeholder={t('Weight (kg)')}
                 value={weight}
                 onChangeText={(t) => setWeight(t.replace(/[^0-9.]/g, ''))}
                 keyboardType="numeric"
                 containerStyle={styles.field}
               />
               <SoftInput
-                placeholder="Age"
+                placeholder={t('Age')}
                 value={age}
                 onChangeText={(t) => setAge(t.replace(/[^0-9]/g, ''))}
                 keyboardType="numeric"
@@ -248,7 +250,7 @@ export function BodyMetricsModal({
               ) : null}
 
               <PrimaryButton
-                label="Save My Body 💗"
+                label={t('Save My Body 💗')}
                 onPress={handleSave}
                 disabled={!valid}
                 loading={saving}

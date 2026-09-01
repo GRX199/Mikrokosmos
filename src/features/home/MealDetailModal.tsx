@@ -4,6 +4,7 @@ import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'rea
 
 import { RoundedCard } from '@/components/RoundedCard';
 import { mealMeta, RADIUS, useAppTheme } from '@/core/theme';
+import { useI18n } from '@/core/i18n';
 import { formatNumber, shortTime } from '@/core/utils/date';
 import type { Meal } from '@/models';
 import { fetchMealById } from '@/repositories/meals';
@@ -26,6 +27,7 @@ export function MealDetailModal({
   onClose: () => void;
 }) {
   const { theme, palette } = useAppTheme();
+  const { t } = useI18n();
   const [meal, setMeal] = useState<Meal | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -74,7 +76,7 @@ export function MealDetailModal({
                 </Text>
                 {meal ? (
                   <Text style={[styles.subtitle, { color: palette.textSecondary }]}>
-                    {mealMeta(meal.meal_type).label} · {shortTime(meal.meal_time)}
+                    {t(mealMeta(meal.meal_type).label)} · {shortTime(meal.meal_time)}
                   </Text>
                 ) : activityText ? (
                   <Text style={[styles.subtitle, { color: palette.textSecondary }]}>
@@ -103,7 +105,7 @@ export function MealDetailModal({
                 {meal.calories != null ? (
                   <View style={[styles.detailRow, { borderBottomColor: palette.border }]}>
                     <Ionicons name="flame" size={20} color={theme.accent} />
-                    <Text style={[styles.detailLabel, { color: palette.text }]}>Calories</Text>
+                    <Text style={[styles.detailLabel, { color: palette.text }]}>{t('Calories')}</Text>
                     <Text style={[styles.detailValue, { color: theme.accent }]}>
                       {formatNumber(meal.calories)} kcal
                     </Text>
@@ -114,7 +116,7 @@ export function MealDetailModal({
                 {meal.components && meal.components.length > 0 ? (
                   <View style={[styles.componentsCard, { backgroundColor: theme.light }]}>
                     <Text style={[styles.componentsTitle, { color: theme.accent }]}>
-                      ✨ What's inside
+                      ✨ {t("What's inside")}
                     </Text>
                     {meal.components.map((part) => (
                       <View key={part.name} style={styles.componentRow}>
@@ -138,7 +140,7 @@ export function MealDetailModal({
                 {meal.notes ? (
                   <View style={[styles.detailRow, { borderBottomColor: palette.border }]}>
                     <Ionicons name="document-text" size={20} color={palette.textSecondary} />
-                    <Text style={[styles.detailLabel, { color: palette.text }]}>Notes</Text>
+                    <Text style={[styles.detailLabel, { color: palette.text }]}>{t('Notes')}</Text>
                     <Text style={[styles.detailValue, { color: palette.textSecondary }]} numberOfLines={3}>
                       {meal.notes}
                     </Text>
@@ -147,22 +149,22 @@ export function MealDetailModal({
 
                 {/* Disclaimer */}
                 <Text style={[styles.disclaimer, { color: palette.textFaint }]}>
-                  ✨ Estimates may vary. Food is fuel and joy — no judgment here.
+                  ✨ {t('Estimates may vary. Food is fuel and joy — no judgment here.')}
                 </Text>
               </ScrollView>
             ) : !loading ? (
               <View style={styles.emptyState}>
                 <Text style={[styles.emptyEmoji]}>🍱</Text>
                 <Text style={[styles.emptyText, { color: palette.textSecondary }]}>
-                  {activityText ? 'Meal logged' : 'Meal details not available'}
+                  {activityText ? t('Meal logged') : t('Meal details not available')}
                 </Text>
                 {!activityText ? (
                   <Text style={[styles.emptySubtext, { color: palette.textFaint }]}>
-                    This meal was logged before detailed tracking was enabled.
+                    {t('This meal was logged before detailed tracking was enabled.')}
                   </Text>
                 ) : null}
                 <Text style={[styles.disclaimer, { color: palette.textFaint }]}>
-                  ✨ Estimates may vary. Food is fuel and joy — no judgment here.
+                  ✨ {t('Estimates may vary. Food is fuel and joy — no judgment here.')}
                 </Text>
               </View>
             ) : null}

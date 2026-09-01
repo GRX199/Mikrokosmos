@@ -12,6 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { RoundedCard } from '@/components/RoundedCard';
 import { MOODS, RADIUS, useAppTheme } from '@/core/theme';
+import { useI18n } from '@/core/i18n';
 import { nowTime } from '@/core/utils/date';
 import type { Mood, Profile } from '@/models';
 
@@ -31,6 +32,7 @@ export function MorningCheckinModal({
   onClose?: () => void;
 }) {
   const { theme, palette } = useAppTheme();
+  const { t } = useI18n();
   const [wakeTime, setWakeTime] = useState(() => nowTime());
   const [hour, minute] = wakeTime.split(':').map(Number);
   const [mood, setMood] = useState<Mood | null>(null);
@@ -66,10 +68,10 @@ export function MorningCheckinModal({
             ) : null}
             <Text style={styles.bigEmoji}>☀️</Text>
             <Text style={[styles.title, { color: palette.text }]}>
-              Good morning, {profile.display_name}
+              {t('Good morning')}, {profile.display_name}
             </Text>
             <Text style={[styles.question, { color: palette.textSecondary }]}>
-              What time did you wake up today?
+              {t('What time did you wake up today?')}
             </Text>
 
             {/* Wake-up time stepper */}
@@ -84,7 +86,7 @@ export function MorningCheckinModal({
             </View>
 
             <Text style={[styles.question, { color: palette.textSecondary, marginTop: 18 }]}>
-              How are you feeling today?
+              {t('How are you feeling today?')}
             </Text>
 
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.moodRow}>
@@ -109,7 +111,7 @@ export function MorningCheckinModal({
                         { color: selected ? palette.white : palette.text },
                       ]}
                     >
-                      {option.label}
+                      {t(option.label)}
                     </Text>
                   </Pressable>
                 );
@@ -117,7 +119,7 @@ export function MorningCheckinModal({
             </ScrollView>
 
             <PrimaryButton
-              label="Start My Day ✨"
+              label={t('Start My Day ✨')}
               onPress={handleSubmit}
               disabled={!mood}
               loading={saving}

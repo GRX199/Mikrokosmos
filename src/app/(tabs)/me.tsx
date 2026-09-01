@@ -208,9 +208,9 @@ export default function MeScreen() {
       <Modal visible={privacyOpen} transparent animationType="slide" onRequestClose={() => setPrivacyOpen(false)}>
         <View style={[styles.sheetBackdrop, { backgroundColor: palette.overlay }]}>
           <View style={[styles.sheet, { backgroundColor: palette.card }]}>
-            <Text style={[styles.sheetTitle, { color: palette.text }]}>Privacy 🤍</Text>
+            <Text style={[styles.sheetTitle, { color: palette.text }]}>{t('Privacy 🤍')}</Text>
             <Text style={[styles.sheetSub, { color: palette.textSecondary }]}>
-              You choose what your friends can see. Everything else stays just yours.
+              {t('You choose what your friends can see. Everything else stays just yours.')}
             </Text>
             {privacy
               ? (
@@ -247,7 +247,7 @@ export default function MeScreen() {
                 ))
               : null}
             <View style={styles.sheetGap} />
-            <PrimaryButton label="Done" onPress={() => setPrivacyOpen(false)} />
+            <PrimaryButton label={t('Done')} onPress={() => setPrivacyOpen(false)} />
           </View>
         </View>
       </Modal>
@@ -402,9 +402,9 @@ function EditProfileModal({
           />
 
           <View style={styles.sheetGap} />
-          <PrimaryButton label="Save" onPress={handleSave} loading={saving} disabled={!displayName.trim()} />
+          <PrimaryButton label={t('Save')} onPress={handleSave} loading={saving} disabled={!displayName.trim()} />
           <Pressable onPress={onClose} style={styles.laterButton}>
-            <Text style={[styles.laterText, { color: palette.textSecondary }]}>Cancel</Text>
+            <Text style={[styles.laterText, { color: palette.textSecondary }]}>{t('Cancel')}</Text>
           </Pressable>
         </View>
       </View>
@@ -465,7 +465,7 @@ function ChangePasswordModal({ visible, onClose }: { visible: boolean; onClose: 
           <View style={styles.sheetGap} />
           <PrimaryButton label={t('Update Password')} onPress={handleSave} loading={saving} />
           <Pressable onPress={onClose} style={styles.laterButton}>
-            <Text style={[styles.laterText, { color: palette.textSecondary }]}>Cancel</Text>
+            <Text style={[styles.laterText, { color: palette.textSecondary }]}>{t('Cancel')}</Text>
           </Pressable>
         </View>
       </View>

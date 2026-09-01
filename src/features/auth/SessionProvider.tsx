@@ -11,6 +11,7 @@ import React, {
 
 import { emailForUsername, MEMBERS } from '@/core/constants/app';
 import { getSupabase, isSupabaseConfigured } from '@/core/services/supabase';
+import { setSessionUsername } from '@/core/session/bridge';
 import type { Profile } from '@/models';
 import { fetchProfile } from '@/repositories/profiles';
 import { MOCK_PROFILES } from '@/repositories/mockStore';
@@ -80,7 +81,9 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       if (!isSupabaseConfigured) {
         const mockId = await AsyncStorage.getItem(MOCK_SESSION_KEY);
         if (mounted && mockId) {
-          setProfile(MOCK_PROFILES.find((p) => p.id === mockId) ?? null);
+          const mockProfile = MOCK_PROFILES.find((p) => p.id === mockId) ?? null;
+          setSessionUsername(mockProfile?.username ?? null);
+          setProfile(mockProfile);
         }
         if (mounted) setIsLoading(false);
         return;
@@ -89,15 +92,20 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       const { data } = await supabase.auth.getSession();
       const session: Session | null = data.session;
       if (session?.user && mounted) {
-        setProfile(await loadProfile(session.user.id));
+        const loaded = await loadProfile(session.user.id);
+        setSessionUsername(loaded?.username ?? null);
+        setProfile(loaded);
       }
       if (mounted) setIsLoading(false);
 
       supabase.auth.onAuthStateChange(async (_event, newSession) => {
         if (!mounted) return;
         if (newSession?.user) {
-          setProfile(await loadProfile(newSession.user.id));
+          const loaded = await loadProfile(newSession.user.id);
+          setSessionUsername(loaded?.username ?? null);
+          setProfile(loaded);
         } else {
+          setSessionUsername(null);
           setProfile(null);
         }
       });
@@ -121,6 +129,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         const mockProfile = MOCK_PROFILES.find((p) => p.username === clean) ?? null;
         if (mockProfile) {
           await AsyncStorage.setItem(MOCK_SESSION_KEY, mockProfile.id);
+          setSessionUsername(mockProfile.username);
           setProfile(mockProfile);
         }
         return null;
@@ -142,6 +151,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     } else {
       await AsyncStorage.removeItem(MOCK_SESSION_KEY);
     }
+    setSessionUsername(null);
     setProfile(null);
   }, []);
 
