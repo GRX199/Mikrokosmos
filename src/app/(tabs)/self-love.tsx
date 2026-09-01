@@ -462,7 +462,7 @@ export default function SelfLoveScreen() {
                 {resolvedImages[meal.id] ? (
                   <Image
                     source={{ uri: resolvedImages[meal.id] }}
-                    style={styles.diaryThumbnail}
+                    style={[styles.diaryThumbnail, { backgroundColor: palette.overlay }]}
                   />
                 ) : (
                   <View style={[styles.diaryIcon, { backgroundColor: theme.light }]}>

@@ -93,7 +93,7 @@ export function MealDetailModal({
             {imageUrl ? (
               <Image
                 source={{ uri: imageUrl }}
-                style={styles.photo}
+                style={[styles.photo, { backgroundColor: palette.overlay }]}
                 resizeMode="cover"
               />
             ) : null}
