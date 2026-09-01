@@ -166,6 +166,12 @@ export default function MeScreen() {
             onPress={() => router.push('/calendar')}
           />
           <MenuItem
+            icon="mail-outline"
+            label={t('Fan Mail 💌')}
+            hint={t('Fans ask, you answer 💗')}
+            onPress={() => router.push('/fan-mail')}
+          />
+          <MenuItem
             icon="key-outline"
             label={t('Change Password')}
             hint={isMock ? t('Connect Supabase to enable') : t('Keep your universe safe')}

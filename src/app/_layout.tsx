@@ -91,6 +91,7 @@ function AppStack({ ready }: { ready: boolean }) {
         <Stack.Screen name="memories" options={{ animation: 'slide_from_bottom' }} />
         <Stack.Screen name="achievements" options={{ animation: 'slide_from_bottom' }} />
         <Stack.Screen name="calendar" options={{ animation: 'slide_from_bottom' }} />
+        <Stack.Screen name="fan-mail" options={{ animation: 'slide_from_bottom' }} />
       </Stack>
     </NavigationThemeProvider>
   );

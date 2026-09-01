@@ -384,6 +384,27 @@ const ID: Record<string, string> = {
   'Something drifted out of orbit. Try again?': 'Ada yang keluar dari orbit. Coba lagi?',
   'You choose what your friends can see. Everything else stays just yours.':
     'Kamu yang memilih apa yang bisa dilihat teman-teman. Sisanya tetap milikmu sendiri.',
+
+  // ── Fan Mail ────────────────────────────────────────────────────
+  'Fan Mail 💌': 'Surat Fans 💌',
+  'Little letters from your fans': 'Surat-surat kecil dari fansmu',
+  'n letters waiting': 'surat menunggu',
+  '1 letter is waiting for you 💌': '1 surat menunggumu 💌',
+  'letters are waiting for you 💌': 'surat menunggumu 💌',
+  'Could not open your fan mail.': 'Gagal membuka surat fansmu.',
+  'Opening the letters…': 'Membuka surat-suratnya…',
+  'No letters yet': 'Belum ada surat',
+  'Tap the envelope to receive your first fan letter!':
+    'Ketuk amplop untuk menerima surat fans pertamamu!',
+  'The letter got lost in the mail… try again?': 'Suratnya nyasar di perjalanan… coba lagi?',
+  'Reply to': 'Balas ke',
+  'Write something warm…': 'Tulis sesuatu yang hangat…',
+  'Send Reply 💗': 'Kirim Balasan 💗',
+  'Write a Reply 💗': 'Tulis Balasan 💗',
+  'Your reply': 'Balasanmu',
+  'the fan loved your reply': 'fansmu menyukai balasanmu',
+  'Fan questions for you': 'Pertanyaan fans untukmu',
+  'Fans ask, you answer 💗': 'Fans bertanya, kamu menjawab 💗',
 };
 
 export interface I18nContextValue {

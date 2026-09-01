@@ -123,6 +123,20 @@ export interface Memory {
   created_at: string;
 }
 
+/** A fan's letter to one member — the member replies when she wants. */
+export interface FanMail {
+  id: string;
+  member_id: string; // recipient (one of the trio)
+  fan_name: string;
+  fan_emoji: string;
+  question: string;
+  reply?: string | null;
+  reply_reaction?: 'love' | 'cry' | 'hype' | null; // fan reaction to the reply
+  reply_reaction_at?: string | null;
+  reply_at?: string | null;
+  created_at: string;
+}
+
 export type ActivityType =
   | 'checkin'
   | 'meal'
