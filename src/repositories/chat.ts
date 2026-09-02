@@ -134,9 +134,17 @@ export async function toggleReaction(
 
 /**
  * Subscribe to new messages. Returns an unsubscribe function.
- * In Supabase mode this uses the realtime channel on `messages`.
+ *
+ * Supabase mode uses ONE shared realtime channel for all subscribers
+ * (the chat screen + SocialHub). Extra calls must never re-subscribe the
+ * same channel — supabase-js throws "cannot add callbacks after
+ * subscribe()" when a reused channel name gets `.on()` again.
  */
-export function subscribeToMessages(onChange: (message: ChatMessage) => void): () => void {
+type MessageListener = (message: ChatMessage) => void;
+const messageListeners = new Set<MessageListener>();
+let chatChannel: ReturnType<ReturnType<typeof getSupabase>['channel']> | null = null;
+
+export function subscribeToMessages(onChange: MessageListener): () => void {
   if (!isSupabaseConfigured) {
     const listener: Listener = () => {
       const last = mockMessages[mockMessages.length - 1];
@@ -145,15 +153,25 @@ export function subscribeToMessages(onChange: (message: ChatMessage) => void): (
     mockListeners.add(listener);
     return () => mockListeners.delete(listener);
   }
-  const channel = getSupabase()
-    .channel('mikrokosmos-chat')
-    .on(
-      'postgres_changes',
-      { event: 'INSERT', schema: 'public', table: 'messages' },
-      (payload) => onChange(payload.new as ChatMessage)
-    )
-    .subscribe();
+  messageListeners.add(onChange);
+  if (!chatChannel) {
+    chatChannel = getSupabase()
+      .channel('mikrokosmos-chat')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'messages' },
+        (payload) => {
+          const incoming = payload.new as ChatMessage;
+          messageListeners.forEach((fn) => fn(incoming));
+        }
+      )
+      .subscribe();
+  }
   return () => {
-    getSupabase().removeChannel(channel);
+    messageListeners.delete(onChange);
+    if (messageListeners.size === 0 && chatChannel) {
+      getSupabase().removeChannel(chatChannel);
+      chatChannel = null;
+    }
   };
 }

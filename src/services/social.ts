@@ -9,13 +9,26 @@
  */
 
 import { AppState, Platform, type AppStateStatus } from 'react-native';
-import * as Notifications from 'expo-notifications';
 
 import type { Activity, ChatMessage } from '@/models';
 import type { AppLanguage } from '@/core/i18n/I18nProvider';
 
 /** Web has no notification support — the in-app toast covers it there. */
 const isNative = Platform.OS === 'android' || Platform.OS === 'ios';
+
+/**
+ * Lazy-require expo-notifications so the web bundle never even loads the
+ * module (its top-level addPushTokenListener prints a web warning).
+ */
+function notifyNow(identifier: string, title: string, body: string): Promise<void> {
+  if (!isNative) return Promise.resolve();
+  const Notifications = require('expo-notifications') as typeof import('expo-notifications');
+  return Notifications.scheduleNotificationAsync({
+    identifier,
+    content: { title, body },
+    trigger: null, // fire immediately
+  }).then(() => undefined);
+}
 
 export interface SocialEvent {
   kind: 'activity' | 'chat';
@@ -104,14 +117,11 @@ async function maybeNotifyBackground(event: SocialEvent): Promise<void> {
   const copy = SOCIAL_COPY[event.kind][currentLang] ?? SOCIAL_COPY[event.kind].id;
   const preview = event.text ? `${event.actorName}: ${event.text}` : event.actorName;
   try {
-    await Notifications.scheduleNotificationAsync({
-      identifier: `social.${event.kind}.${Date.now()}`,
-      content: {
-        title: copy.title,
-        body: preview.length > 90 ? `${preview.slice(0, 87)}…` : preview,
-      },
-      trigger: null, // fire immediately
-    });
+    await notifyNow(
+      `social.${event.kind}.${Date.now()}`,
+      copy.title,
+      preview.length > 90 ? `${preview.slice(0, 87)}…` : preview
+    );
   } catch {
     // no permission or scheduling failed — the in-app toast still shows
   }

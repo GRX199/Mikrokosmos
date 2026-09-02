@@ -6,32 +6,45 @@
  * needed), all cancellable, and nothing fires while she's active in the app.
  *
  * Android 13+ asks for POST_NOTIFICATIONS permission on first schedule.
+ *
+ * expo-notifications is required LAZILY: importing it on web prints a
+ * "push token changes not supported on web" warning from its top-level
+ * side effects, so the web bundle must not load the module at all.
  */
 
 import { Platform } from 'react-native';
-import * as Notifications from 'expo-notifications';
 
 import type { AppLanguage } from '@/core/i18n/I18nProvider';
 
-/** Web has no local-notification support — skip all of it there. */
+type NotificationsModule = typeof import('expo-notifications');
+
 const isNative = Platform.OS === 'android' || Platform.OS === 'ios';
+let mod: NotificationsModule | null = null;
+
+/** Load expo-notifications only on native platforms. */
+function notifications(): NotificationsModule | null {
+  if (!isNative) return null;
+  if (!mod) mod = require('expo-notifications') as NotificationsModule;
+  return mod;
+}
 
 export type NotifKind =
   | 'morning_checkin' // "start your day" if no check-in yet
   | 'water_early' // halfway water nudge
   | 'water_goal' // one glass left
   | 'meal_photo' // dinner-time "log your meal ✨"
-  | 'fan_mail'; // a fan letter is waiting
+  | 'fan_mail'; // a fan question is waiting
 
 let configured = false;
 let permissionAsked = false;
 
 /** How the notification behaves when it fires (foreground = in-app banner). */
 export async function configureNotifications(): Promise<void> {
-  if (configured || !isNative) return;
+  const N = notifications();
+  if (configured || !N) return;
   configured = true;
 
-  Notifications.setNotificationHandler({
+  N.setNotificationHandler({
     handleNotification: async () => ({
       shouldShowBanner: true,
       shouldShowList: true,
@@ -43,19 +56,20 @@ export async function configureNotifications(): Promise<void> {
 
 /** Ask for permission (Android 13+ / iOS). Returns true if we may notify. */
 export async function ensurePermission(): Promise<boolean> {
-  if (!isNative) return false;
+  const N = notifications();
+  if (!N) return false;
   await configureNotifications();
   if (permissionAsked) {
-    const current = await Notifications.getPermissionsAsync();
-    return current.granted || current.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL;
+    const current = await N.getPermissionsAsync();
+    return current.granted || current.ios?.status === N.IosAuthorizationStatus.PROVISIONAL;
   }
   permissionAsked = true;
-  const settings = await Notifications.requestPermissionsAsync({
+  const settings = await N.requestPermissionsAsync({
     ios: { allowAlert: true, allowBadge: true, allowSound: false },
   });
   return (
     settings.granted ||
-    settings.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL
+    settings.ios?.status === N.IosAuthorizationStatus.PROVISIONAL
   );
 }
 
@@ -94,18 +108,19 @@ export async function scheduleNudge(
   at: Date,
   options?: { repeats?: boolean }
 ): Promise<string | null> {
-  const allowed = await ensurePermission();
-  if (!allowed) return null;
+  const N = notifications();
+  const allowed = N ? await ensurePermission() : false;
+  if (!N || !allowed) return null;
   const copy = COPY[kind][lang] ?? COPY[kind].id;
 
   // Cancel any previous nudge of the same kind before rescheduling.
   await cancelNudge(kind);
 
-  const id = await Notifications.scheduleNotificationAsync({
+  const id = await N.scheduleNotificationAsync({
     identifier: `nudge.${kind}`,
     content: { title: copy.title, body: copy.body },
     trigger: {
-      type: Notifications.SchedulableTriggerInputTypes.DATE,
+      type: N.SchedulableTriggerInputTypes.DATE,
       date: at,
     },
   });
@@ -114,9 +129,10 @@ export async function scheduleNudge(
 
 /** Remove a pending nudge (e.g. she already checked in). */
 export async function cancelNudge(kind: NotifKind): Promise<void> {
-  if (!isNative) return;
+  const N = notifications();
+  if (!N) return;
   try {
-    await Notifications.cancelScheduledNotificationAsync(`nudge.${kind}`);
+    await N.cancelScheduledNotificationAsync(`nudge.${kind}`);
   } catch {
     // not scheduled — fine
   }
@@ -138,8 +154,9 @@ export function nudgeRoute(kind: NotifKind): string {
 
 /** Wire nudge taps to navigation. Call once from the root layout. */
 export function bindNudgeNavigation(navigate: (path: string) => void): () => void {
-  if (!isNative) return () => {}; // web: nothing to bind
-  const sub = Notifications.addNotificationResponseReceivedListener((response) => {
+  const N = notifications();
+  if (!N) return () => {}; // web: nothing to bind
+  const sub = N.addNotificationResponseReceivedListener((response) => {
     const id = response.notification.request.identifier;
     if (id.startsWith('nudge.')) {
       const kind = id.replace('nudge.', '') as NotifKind;
@@ -148,5 +165,3 @@ export function bindNudgeNavigation(navigate: (path: string) => void): () => voi
   });
   return () => sub.remove();
 }
-
-export const isAndroid = Platform.OS === 'android';

@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -57,6 +57,13 @@ export default function FanMailScreen() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [answering, setAnswering] = useState<FanQuestion | null>(null);
   const [answerDraft, setAnswerDraft] = useState('');
+  // Blur the input BEFORE the modal unmounts, so react-native-web never
+  // hides a still-focused element behind aria-hidden (a11y warning).
+  const answerInputRef = useRef<TextInput>(null);
+  const closeAnswerSheet = useCallback(() => {
+    answerInputRef.current?.blur();
+    setAnswering(null);
+  }, []);
 
   const load = useCallback(async () => {
     setRefreshing(true);
@@ -208,19 +215,19 @@ export default function FanMailScreen() {
       </ScrollView>
 
       {/* Answer sheet */}
-      <Modal visible={answering !== null} transparent animationType="slide" onRequestClose={() => setAnswering(null)}>
+      <Modal visible={answering !== null} transparent animationType="slide" onRequestClose={closeAnswerSheet}>
         <KeyboardAvoidingView
           style={[styles.backdrop, { backgroundColor: palette.overlay }]}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
-          <Pressable style={styles.backdropFill} onPress={() => setAnswering(null)}>
+          <Pressable style={styles.backdropFill} onPress={closeAnswerSheet}>
             <Pressable onPress={() => {}} style={styles.sheetAnchor}>
               <RoundedCard style={styles.sheet}>
                 <View style={styles.sheetHeader}>
                   <Text style={[styles.sheetTitle, { color: palette.text }]} numberOfLines={1}>
                     {answering?.fan_emoji} {answering?.fan_name}
                   </Text>
-                  <Pressable onPress={() => setAnswering(null)} style={styles.closeButton}>
+                  <Pressable onPress={closeAnswerSheet} style={styles.closeButton}>
                     <Ionicons name="close" size={22} color={palette.textSecondary} />
                   </Pressable>
                 </View>
@@ -228,6 +235,7 @@ export default function FanMailScreen() {
                   {answering?.question}
                 </Text>
                 <TextInput
+                  ref={answerInputRef}
                   value={answerDraft}
                   onChangeText={setAnswerDraft}
                   placeholder={t('Write something warm…')}

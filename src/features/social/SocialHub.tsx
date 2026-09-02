@@ -191,10 +191,8 @@ const styles = StyleSheet.create({
     padding: 14,
     borderRadius: 18,
     borderWidth: 1,
-    shadowColor: '#000',
-    shadowOpacity: 0.14,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 6 },
+    // RN 0.86 web: boxShadow replaces the deprecated shadow* props.
+    boxShadow: '0px 6px 18px rgba(0,0,0,0.14)',
     elevation: 8,
   },
   toastBody: { flexShrink: 1 },
