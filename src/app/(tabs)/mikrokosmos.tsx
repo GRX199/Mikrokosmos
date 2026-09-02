@@ -51,6 +51,9 @@ export default function ChatScreen() {
   // Is the user reading near the bottom? If she scrolled up through
   // history, new messages must NOT yank her down.
   const nearBottomRef = useRef(true);
+  // Last known content height — guards onContentSizeChange against
+  // Android layout oscillation (keyboard/insets) re-yanking the scroll.
+  const lastContentHeightRef = useRef<number | null>(null);
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [reactions, setReactions] = useState<Record<string, MessageReaction[]>>({});
@@ -89,9 +92,9 @@ export default function ChatScreen() {
     }
   }, [loadReactions]);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  // NOTE: initial load happens in useFocusEffect below (fires on mount too)
+  // — a second useEffect here caused a visible double-fetch "blink" every
+  // time the tab opened or came back into focus.
 
   // Catch up on anything missed while the tab was in the background —
   // realtime can drop events (reconnects, deep sleep).
@@ -314,12 +317,15 @@ export default function ChatScreen() {
             nearBottomRef.current = distanceFromBottom < 60;
           }}
           scrollEventThrottle={16}
-          onContentSizeChange={() => {
-            // After any content growth (new message, image load) pin to the
-            // newest message — but only while she's reading near the bottom.
-            if (isFocusedRef.current && nearBottomRef.current) {
+          onContentSizeChange={(_w, h) => {
+            // After any content GROWTH (new message, image load) pin to the
+            // newest message — but only when the list actually got taller.
+            // Without the height guard, Android layout oscillations (keyboard
+            // show/hide, image settle) made the list "yank" in a loop.
+            if (h > (lastContentHeightRef.current ?? 0) && isFocusedRef.current && nearBottomRef.current) {
               listRef.current?.scrollToOffset({ offset: 1e9, animated: false });
             }
+            lastContentHeightRef.current = h;
           }}
           renderItem={({ item }) => (
             <MessageBubble
@@ -440,16 +446,7 @@ function isSupabaseRealtime(): boolean {
   return Boolean(process.env.EXPO_PUBLIC_SUPABASE_URL);
 }
 
-function MessageBubble({
-  message,
-  mine,
-  sender,
-  replyPreviewOf,
-  profileMap,
-  reactions,
-  onLongPress,
-  onReply,
-}: {
+interface MessageBubbleProps {
   message: ChatMessage;
   mine: boolean;
   sender: Profile | null;
@@ -458,7 +455,19 @@ function MessageBubble({
   reactions: MessageReaction[];
   onLongPress: () => void;
   onReply: () => void;
-}) {
+}
+
+/** Memoized: typing in the composer must never re-render the whole list. */
+const MessageBubble = React.memo(function MessageBubble({
+  message,
+  mine,
+  sender,
+  replyPreviewOf,
+  profileMap,
+  reactions,
+  onLongPress,
+  onReply,
+}: MessageBubbleProps) {
   const { theme, palette } = useAppTheme();
   const { language } = useI18n();
 
@@ -547,7 +556,7 @@ function MessageBubble({
       ) : null}
     </View>
   );
-}
+});
 
 function MediaImage({ pathOrUri }: { pathOrUri: string }) {
   const [url, setUrl] = useState<string | null>(null);
