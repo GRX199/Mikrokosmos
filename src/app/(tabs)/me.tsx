@@ -168,7 +168,7 @@ export default function MeScreen() {
           <MenuItem
             icon="mail-outline"
             label={t('Fan Mail 💌')}
-            hint={t('Fans ask, you answer 💗')}
+            hint={t('Fans ask, everyone answers 💗')}
             onPress={() => router.push('/fan-mail')}
           />
           <MenuItem

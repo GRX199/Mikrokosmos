@@ -14,6 +14,9 @@ import * as Notifications from 'expo-notifications';
 import type { Activity, ChatMessage } from '@/models';
 import type { AppLanguage } from '@/core/i18n/I18nProvider';
 
+/** Web has no notification support — the in-app toast covers it there. */
+const isNative = Platform.OS === 'android' || Platform.OS === 'ios';
+
 export interface SocialEvent {
   kind: 'activity' | 'chat';
   actorName: string;
@@ -96,7 +99,7 @@ export function setChatScreenVisible(visible: boolean): void {
 }
 
 async function maybeNotifyBackground(event: SocialEvent): Promise<void> {
-  if (Platform.OS !== 'android' || !appStateReady) return;
+  if (!isNative || !appStateReady) return;
   if (!isAppBackgrounded()) return; // in-app toast already covers foreground
   const copy = SOCIAL_COPY[event.kind][currentLang] ?? SOCIAL_COPY[event.kind].id;
   const preview = event.text ? `${event.actorName}: ${event.text}` : event.actorName;

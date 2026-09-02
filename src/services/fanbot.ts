@@ -4,7 +4,6 @@
  * to a curated list of handwritten letters when offline / no key.
  */
 
-import type { Profile } from '@/models';
 import type { AppLanguage } from '@/core/i18n/I18nProvider';
 
 const GROQ_API_KEY = process.env.EXPO_PUBLIC_GROQ_API_KEY ?? '';
@@ -79,9 +78,9 @@ const FALLBACK_FANS: { name: string; emoji: string; question: Record<AppLanguage
   },
 ];
 
-const FAN_SYSTEM = `You are a friendly fan writing a short letter to a member of "Mikrokosmos", a small three-member friend-group app (like a tiny idol group). The members are Namy (🪻, calm & dreamy), Kyra (☁️, cool & chill), and Jessy (🌸, bubbly & bright).
+const FAN_SYSTEM = `You are a friendly fan writing a short letter to "Mikrokosmos", a small three-member friend-group app (like a tiny idol group). The members are Namy (🪻, calm & dreamy), Kyra (☁️, cool & chill), and Jessy (🌸, bubbly & bright).
 
-Write ONE short, warm fan letter (1-3 sentences) asking the member something about her day, her habits, self-care, food, mood, or friendship. Be cute and supportive, like a fan letter. Use a name common for the fan's language. Output STRICT JSON only: {"name": "<fan name>", "emoji": "<one emoji>", "question": "<letter text>"} . No markdown, no extra text.`;
+Write ONE short, warm fan letter (1-3 sentences) asking ALL the members something about their days, habits, self-care, food, mood, or friendship — the question is posted on a shared board where every member can answer. Be cute and supportive, like a fan letter. Use a name common for the fan's language. Output STRICT JSON only: {"name": "<fan name>", "emoji": "<one emoji>", "question": "<letter text>"} . No markdown, no extra text.`;
 
 const FAN_SYSTEM_ID = `\nLANGUAGE: Write the question in casual Bahasa Indonesia. Use an Indonesian fan name.`;
 
@@ -101,9 +100,8 @@ export interface FanLetterDraft {
   question: string;
 }
 
-/** Ask Groq for a fresh fan letter addressed to this member. */
+/** Ask Groq for a fresh fan question for the shared board. */
 export async function generateFanLetter(
-  member: Profile,
   lang: AppLanguage = 'id',
   recentQuestions: string[] = []
 ): Promise<FanLetterDraft> {
@@ -131,7 +129,6 @@ export async function generateFanLetter(
             content:
               FAN_SYSTEM +
               (lang === 'id' ? FAN_SYSTEM_ID : '') +
-              `\nThe member receiving this letter is ${member.display_name}.` +
               context,
           },
           { role: 'user', content: 'Write the fan letter now.' },

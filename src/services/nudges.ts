@@ -13,6 +13,9 @@ import * as Notifications from 'expo-notifications';
 
 import type { AppLanguage } from '@/core/i18n/I18nProvider';
 
+/** Web has no local-notification support — skip all of it there. */
+const isNative = Platform.OS === 'android' || Platform.OS === 'ios';
+
 export type NotifKind =
   | 'morning_checkin' // "start your day" if no check-in yet
   | 'water_early' // halfway water nudge
@@ -25,7 +28,7 @@ let permissionAsked = false;
 
 /** How the notification behaves when it fires (foreground = in-app banner). */
 export async function configureNotifications(): Promise<void> {
-  if (configured) return;
+  if (configured || !isNative) return;
   configured = true;
 
   Notifications.setNotificationHandler({
@@ -40,6 +43,7 @@ export async function configureNotifications(): Promise<void> {
 
 /** Ask for permission (Android 13+ / iOS). Returns true if we may notify. */
 export async function ensurePermission(): Promise<boolean> {
+  if (!isNative) return false;
   await configureNotifications();
   if (permissionAsked) {
     const current = await Notifications.getPermissionsAsync();
@@ -110,6 +114,7 @@ export async function scheduleNudge(
 
 /** Remove a pending nudge (e.g. she already checked in). */
 export async function cancelNudge(kind: NotifKind): Promise<void> {
+  if (!isNative) return;
   try {
     await Notifications.cancelScheduledNotificationAsync(`nudge.${kind}`);
   } catch {
@@ -133,6 +138,7 @@ export function nudgeRoute(kind: NotifKind): string {
 
 /** Wire nudge taps to navigation. Call once from the root layout. */
 export function bindNudgeNavigation(navigate: (path: string) => void): () => void {
+  if (!isNative) return () => {}; // web: nothing to bind
   const sub = Notifications.addNotificationResponseReceivedListener((response) => {
     const id = response.notification.request.identifier;
     if (id.startsWith('nudge.')) {

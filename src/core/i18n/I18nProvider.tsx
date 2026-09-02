@@ -397,14 +397,24 @@ const ID: Record<string, string> = {
   'Tap the envelope to receive your first fan letter!':
     'Ketuk amplop untuk menerima surat fans pertamamu!',
   'The letter got lost in the mail… try again?': 'Suratnya nyasar di perjalanan… coba lagi?',
+  'The reply got lost — try again?': 'Balasannya nyasar — coba lagi?',
   'Reply to': 'Balas ke',
   'Write something warm…': 'Tulis sesuatu yang hangat…',
   'Send Reply 💗': 'Kirim Balasan 💗',
   'Write a Reply 💗': 'Tulis Balasan 💗',
   'Your reply': 'Balasanmu',
   'the fan loved your reply': 'fansmu menyukai balasanmu',
+  'the fan loved this reply': 'fansnya menyukai balasan ini',
+  'the fan was touched': 'fansnya terharu',
+  'the fan got hyped!': 'fansnya makin semangat!',
   'Fan questions for you': 'Pertanyaan fans untukmu',
   'Fans ask, you answer 💗': 'Fans bertanya, kamu menjawab 💗',
+  'Fans ask, everyone answers 💗': 'Fans bertanya, semua menjawab 💗',
+  'New fan question': 'Pertanyaan fans baru',
+  'Answer this fan 💗': 'Jawab fans ini 💗',
+  'Edit your reply': 'Ubah balasanmu',
+  'members answered': 'member sudah menjawab',
+  'just now': 'baru saja',
 
   // ── Body metrics modal ─────────────────────────────────────────
   'Only you can see these numbers — never your friends 💗':

@@ -123,17 +123,26 @@ export interface Memory {
   created_at: string;
 }
 
-/** A fan's letter to one member — the member replies when she wants. */
-export interface FanMail {
+/**
+ * Fan Q&A — a shared board. Fans (bots) ask questions to ALL members;
+ * every member can answer on the same page, each with her own reply.
+ */
+export interface FanQuestion {
   id: string;
-  member_id: string; // recipient (one of the trio)
   fan_name: string;
   fan_emoji: string;
   question: string;
-  reply?: string | null;
-  reply_reaction?: 'love' | 'cry' | 'hype' | null; // fan reaction to the reply
-  reply_reaction_at?: string | null;
-  reply_at?: string | null;
+  created_at: string;
+  answers?: FanAnswer[]; // joined when fetching the board
+}
+
+export interface FanAnswer {
+  id: string;
+  question_id: string;
+  member_id: string;
+  answer: string;
+  reaction?: 'love' | 'cry' | 'hype' | null; // fan reaction to this answer
+  reaction_at?: string | null;
   created_at: string;
 }
 

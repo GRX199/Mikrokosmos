@@ -7,6 +7,7 @@ import {
   Modal,
   Platform,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -14,376 +15,416 @@ import {
   View,
 } from 'react-native';
 
-import { PrimaryButton } from '@/components/PrimaryButton';
-import { RoundedCard } from '@/components/RoundedCard';
-import { useAuth } from '@/features/auth/SessionProvider';
+import { GradientCard, RoundedCard } from '@/components/RoundedCard';
+import { Screen } from '@/components/Screen';
+import { SectionTitle } from '@/components/SectionTitle';
+import { LoadingView } from '@/components/LoadingView';
+import { ErrorState } from '@/components/ErrorState';
 import { useI18n } from '@/core/i18n';
-import { RADIUS, useAppTheme } from '@/core/theme';
-import { relativeTime } from '@/core/utils/date';
-import type { FanMail } from '@/models';
+import { useAppTheme } from '@/core/theme';
+import { useAuth } from '@/features/auth/SessionProvider';
 import {
-  fetchFanMails,
-  insertFanMail,
-  reactFanMail,
-  replyFanMail,
+  answerFanQuestion,
+  fetchFanBoard,
+  insertFanQuestion,
+  reactFanAnswer,
+  subscribeToFanBoard,
 } from '@/repositories/fanmail';
+import { fetchProfiles } from '@/repositories/profiles';
 import { generateFanLetter } from '@/services/fanbot';
-import { cancelNudge } from '@/services/nudges';
+import type { FanAnswer, FanQuestion } from '@/models';
+import type { Profile } from '@/models';
+
+const REACTIONS = ['love', 'cry', 'hype'] as const;
+const REACTION_EMOJI: Record<string, string> = { love: '🥰', cry: '🥺', hype: '🤩' };
 
 /**
- * Fan Mail 💌 — bot fans write letters to THIS member; she reads them
- * on a cozy letters shelf and replies whenever she likes. The fan then
- * reacts to her reply (love/cry/hype), like a real fan-vibe moment.
+ * Fan Mail 💌 — a SHARED Q&A board. Bot fans ask questions to the whole
+ * trio; every member reads the same board and answers from the same
+ * page. Each member has one answer per question (editable), and the
+ * fan "reacts" to each answer with a cute emoji.
  */
 export default function FanMailScreen() {
+  const { t } = useI18n();
+  const { language } = useI18n();
   const { theme, palette } = useAppTheme();
-  const { t, language } = useI18n();
   const { profile } = useAuth();
-  const [mails, setMails] = useState<FanMail[]>([]);
-  const [loading, setLoading] = useState(true);
+
+  const [questions, setQuestions] = useState<FanQuestion[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
   const [bringing, setBringing] = useState(false);
-  const [replyingTo, setReplyingTo] = useState<FanMail | null>(null);
-  const [replyDraft, setReplyDraft] = useState('');
+  const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [answering, setAnswering] = useState<FanQuestion | null>(null);
+  const [answerDraft, setAnswerDraft] = useState('');
 
   const load = useCallback(async () => {
-    if (!profile) return;
-    setLoading(true);
-    setError(null);
+    setRefreshing(true);
     try {
-      setMails(await fetchFanMails(profile.id));
+      const [board, all] = await Promise.all([fetchFanBoard(), fetchProfiles()]);
+      setQuestions(board);
+      setProfiles(all);
+      setError(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : t('Could not open your fan mail.'));
+      setError(e instanceof Error ? e.message : 'Failed to load');
     } finally {
-      setLoading(false);
+      setRefreshing(false);
     }
-  }, [profile, t]);
+  }, []);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  const bringNewLetter = async () => {
+  // Realtime: a new fan question or another member's answer lands live.
+  useEffect(() => {
+    const dispose = subscribeToFanBoard(
+      (q) => {
+        setQuestions((prev) => (prev ?? []).some((p) => p.id === q.id) ? prev : [{ ...q, answers: [] }, ...(prev ?? [])]);
+      },
+      (a) => {
+        setQuestions((prev) =>
+          (prev ?? []).map((q) => {
+            if (q.id !== a.question_id) return q;
+            if ((q.answers ?? []).some((x) => x.id === a.id)) return q;
+            return { ...q, answers: [...(q.answers ?? []), a] };
+          })
+        );
+      }
+    );
+    return dispose;
+  }, []);
+
+  const bringNewQuestion = async () => {
     if (!profile || bringing) return;
     setBringing(true);
     try {
       const draft = await generateFanLetter(
-        profile,
         language,
-        mails.map((m) => m.question)
+        (questions ?? []).map((q) => q.question)
       );
-      const mail = await insertFanMail(profile.id, {
+      const q = await insertFanQuestion({
         fan_name: draft.name,
         fan_emoji: draft.emoji,
         question: draft.question,
       });
-      setMails((prev) => [mail, ...prev]);
-      cancelNudge('fan_mail').catch(() => undefined);
-    } catch (e) {
+      setQuestions((prev) => [q, ...(prev ?? [])]);
+    } catch {
       Alert.alert(t('Fan Mail 💌'), t('The letter got lost in the mail… try again?'));
     } finally {
       setBringing(false);
     }
   };
 
-  const sendReply = async () => {
-    if (!replyingTo) return;
-    const text = replyDraft.trim();
+  const submitAnswer = async () => {
+    if (!profile || !answering) return;
+    const text = answerDraft.trim();
     if (!text) return;
-    const target = replyingTo;
-    setReplyingTo(null);
+    const target = answering;
+    setAnswering(null);
     try {
-      await replyFanMail(target.id, text);
-      setMails((prev) =>
-        prev.map((m) => (m.id === target.id ? { ...m, reply: text, reply_at: new Date().toISOString() } : m))
+      const saved = await answerFanQuestion(target.id, profile.id, text);
+      setQuestions((prev) =>
+        (prev ?? []).map((q) => {
+          if (q.id !== target.id) return q;
+          const others = (q.answers ?? []).filter((a) => a.member_id !== profile.id);
+          return { ...q, answers: [...others, saved].sort((a, b) => a.created_at.localeCompare(b.created_at)) };
+        })
       );
-      // The fan reacts ~1.2s after the reply lands (simulated).
-      const reaction = pickFanReaction();
+      // The fan reacts to the answer after a short delay (~1.2s) 💗
       setTimeout(() => {
-        reactFanMail(target.id, reaction).catch(() => undefined);
-        setMails((prev) =>
-          prev.map((m) =>
-            m.id === target.id
-              ? {
-                  ...m,
-                  reply: text,
-                  reply_at: new Date().toISOString(),
-                  reply_reaction: reaction,
-                  reply_reaction_at: new Date().toISOString(),
-                }
-              : m
-          )
-        );
+        const reactions = REACTIONS;
+        const pick = reactions[Math.floor(Math.random() * reactions.length)];
+        reactFanAnswer(saved.id, pick)
+          .then(() => {
+            setQuestions((prev) =>
+              (prev ?? []).map((q) => ({
+                ...q,
+                answers: (q.answers ?? []).map((a) => (a.id === saved.id ? { ...a, reaction: pick } : a)),
+              }))
+            );
+          })
+          .catch(() => undefined);
       }, 1200);
     } catch {
-      Alert.alert(t('Fan Mail 💌'), t('The letter got lost in the mail… try again?'));
+      Alert.alert(t('Fan Mail 💌'), t('The reply got lost — try again?'));
     }
   };
 
-  const unreadCount = mails.filter((m) => !m.reply).length;
+  const startAnswering = (q: FanQuestion) => {
+    const mine = q.answers?.find((a) => a.member_id === profile?.id);
+    setAnswerDraft(mine?.answer ?? '');
+    setAnswering(q);
+  };
+
+  if (!questions && error) return <ErrorState message={error} onRetry={load} />;
+  if (!questions) return <LoadingView label={t('Opening the letters…')} />;
+
+  const nameOf = (id: string) => profiles.find((p) => p.id === id);
 
   return (
-    <View style={[styles.root, { backgroundColor: theme.background }]}>
-      {/* Header */}
+    <Screen padded={false}>
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="chevron-back" size={26} color={palette.text} />
+          <Ionicons name="chevron-back" size={22} color={palette.text} />
         </Pressable>
-        <View style={styles.flex}>
-          <Text style={[styles.title, { color: palette.text }]}>{t('Fan Mail 💌')}</Text>
-          <Text style={[styles.subtitle, { color: palette.textSecondary }]}>
-            {t('Little letters from your fans')}
-          </Text>
-        </View>
+        <Text style={[styles.title, { color: palette.text }]}>{t('Fan Mail 💌')}</Text>
         <Pressable
-          onPress={bringNewLetter}
-          disabled={bringing || !profile}
-          style={[styles.bringButton, { backgroundColor: theme.primary }]}
+          onPress={bringNewQuestion}
+          disabled={bringing}
+          style={[styles.askButton, { backgroundColor: theme.primary }]}
         >
-          <Text style={styles.bringEmoji}>{bringing ? '📮' : '✉️'}</Text>
+          <Text style={styles.askButtonText}>{bringing ? '…' : t('New fan question')}</Text>
         </Pressable>
       </View>
 
-      {/* Unread chip */}
-      {unreadCount > 0 && (
-        <View style={[styles.unreadChip, { backgroundColor: theme.light }]}>
-          <Text style={[styles.unreadText, { color: theme.accent }]}>
-            {unreadCount === 1
-              ? t('1 letter is waiting for you 💌')
-              : `${unreadCount} ${t('letters are waiting for you 💌')}`}
-          </Text>
-        </View>
-      )}
-
       <ScrollView
-        style={styles.list}
-        contentContainerStyle={{ paddingVertical: 16, paddingBottom: 120 }}
+        contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={load} tintColor={theme.primary} />
+        }
       >
-        {error ? (
-          <EmptyState
-            emoji="📡"
-            title={t('Could not open your fan mail.')}
-            subtitle={error}
-            actionLabel={t('Try again')}
-            onAction={load}
-          />
-        ) : loading ? (
-          <EmptyState emoji="💌" title={t('Opening the letters…')} subtitle={null} />
-        ) : mails.length === 0 ? (
-          <EmptyState
-            emoji="📮"
-            title={t('No letters yet')}
-            subtitle={t('Tap the envelope to receive your first fan letter!')}
-          />
+        <SectionTitle title={t('Fans ask, everyone answers 💗')} />
+        {questions.length === 0 ? (
+          <RoundedCard style={styles.emptyCard}>
+            <Text style={[styles.emptyEmoji]}>💌</Text>
+            <Text style={[styles.emptyText, { color: palette.textSecondary }]}>
+              {t('Tap the envelope to receive your first fan letter!')}
+            </Text>
+          </RoundedCard>
         ) : (
-          mails.map((mail) => (
-            <LetterCard
-              key={mail.id}
-              mail={mail}
-              onReply={() => {
-                setReplyDraft('');
-                setReplyingTo(mail);
-              }}
+          questions.map((q) => (
+            <QuestionCard
+              key={q.id}
+              question={q}
+              profiles={profiles}
+              myId={profile?.id ?? ''}
+              nameOf={nameOf}
+              onAnswer={() => startAnswering(q)}
             />
           ))
         )}
       </ScrollView>
 
-      {/* Reply sheet */}
-      <Modal
-        visible={!!replyingTo}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setReplyingTo(null)}
-      >
+      {/* Answer sheet */}
+      <Modal visible={answering !== null} transparent animationType="slide" onRequestClose={() => setAnswering(null)}>
         <KeyboardAvoidingView
+          style={[styles.backdrop, { backgroundColor: palette.overlay }]}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={styles.replyOverlay}
         >
-          <Pressable style={styles.replyOverlay} onPress={() => setReplyingTo(null)}>
-            <Pressable onPress={(e) => e.stopPropagation()}>
-              <RoundedCard style={[styles.replyCard, { backgroundColor: palette.card }]}>
-                <Text style={[styles.replyTitle, { color: palette.text }]}>
-                  {t('Reply to')} {replyingTo?.fan_name}
+          <Pressable style={styles.backdropFill} onPress={() => setAnswering(null)}>
+            <Pressable onPress={() => {}} style={styles.sheetAnchor}>
+              <RoundedCard style={styles.sheet}>
+                <View style={styles.sheetHeader}>
+                  <Text style={[styles.sheetTitle, { color: palette.text }]} numberOfLines={1}>
+                    {answering?.fan_emoji} {answering?.fan_name}
+                  </Text>
+                  <Pressable onPress={() => setAnswering(null)} style={styles.closeButton}>
+                    <Ionicons name="close" size={22} color={palette.textSecondary} />
+                  </Pressable>
+                </View>
+                <Text style={[styles.sheetQuestion, { color: palette.textSecondary }]}>
+                  {answering?.question}
                 </Text>
                 <TextInput
-                  value={replyDraft}
-                  onChangeText={setReplyDraft}
+                  value={answerDraft}
+                  onChangeText={setAnswerDraft}
                   placeholder={t('Write something warm…')}
                   placeholderTextColor={palette.textFaint}
                   multiline
+                  style={[styles.answerInput, { backgroundColor: palette.card, color: palette.text, borderColor: palette.border }]}
                   autoFocus
-                  style={[styles.replyInput, { color: palette.text, borderColor: palette.border }]}
                 />
-                <PrimaryButton
-                  label={t('Send Reply 💗')}
-                  onPress={sendReply}
-                  disabled={!replyDraft.trim()}
-                />
-                <Pressable onPress={() => setReplyingTo(null)} style={styles.laterButton}>
-                  <Text style={[styles.laterText, { color: palette.textSecondary }]}>{t('Cancel')}</Text>
+                <Pressable
+                  onPress={submitAnswer}
+                  disabled={!answerDraft.trim()}
+                  style={[styles.sendButton, { backgroundColor: answerDraft.trim() ? theme.primary : palette.border }]}
+                >
+                  <Text style={[styles.sendButtonText, { color: answerDraft.trim() ? palette.white : palette.textFaint }]}>
+                    {t('Send Reply 💗')}
+                  </Text>
                 </Pressable>
               </RoundedCard>
             </Pressable>
           </Pressable>
         </KeyboardAvoidingView>
       </Modal>
-    </View>
+    </Screen>
   );
 }
 
-function pickFanReaction(): 'love' | 'cry' | 'hype' {
-  const pool: ('love' | 'cry' | 'hype')[] = ['love', 'love', 'hype', 'cry'];
-  return pool[Math.floor(Math.random() * pool.length)];
-}
-
-function LetterCard({ mail, onReply }: { mail: FanMail; onReply: () => void }) {
+function QuestionCard({
+  question,
+  profiles,
+  myId,
+  nameOf,
+  onAnswer,
+}: {
+  question: FanQuestion;
+  profiles: Profile[];
+  myId: string;
+  nameOf: (id: string) => Profile | undefined;
+  onAnswer: () => void;
+}) {
+  const { t } = useI18n();
   const { theme, palette } = useAppTheme();
-  const { t, language } = useI18n();
-
-  const reactionEmoji =
-    mail.reply_reaction === 'love' ? '🥰' : mail.reply_reaction === 'cry' ? '🥺' : mail.reply_reaction === 'hype' ? '🤩' : null;
+  const answers = question.answers ?? [];
+  const myAnswer = answers.find((a) => a.member_id === myId);
+  const waitingForMe = !myAnswer;
 
   return (
-    <RoundedCard style={[styles.card, { backgroundColor: palette.card }]}>
-      {/* Fan header */}
+    <GradientCard style={styles.card}>
       <View style={styles.fanRow}>
-        <View style={[styles.fanAvatar, { backgroundColor: theme.light }]}>
-          <Text style={styles.fanAvatarEmoji}>{mail.fan_emoji}</Text>
-        </View>
-        <View style={styles.flex}>
-          <Text style={[styles.fanName, { color: palette.text }]}>{mail.fan_name}</Text>
+        <Text style={styles.fanEmoji}>{question.fan_emoji}</Text>
+        <View style={styles.fanMeta}>
+          <Text style={[styles.fanName, { color: palette.text }]}>{question.fan_name}</Text>
           <Text style={[styles.fanTime, { color: palette.textFaint }]}>
-            {relativeTime(mail.created_at, language)}
+            {relativeTime(question.created_at, t)}
           </Text>
         </View>
-        <Text style={styles.letterMark}>✉️</Text>
       </View>
+      <Text style={[styles.questionText, { color: palette.text }]}>{question.question}</Text>
 
-      {/* Question */}
-      <Text style={[styles.question, { color: palette.text }]}>{mail.question}</Text>
-
-      {/* Reply / CTA */}
-      {mail.reply ? (
-        <View style={[styles.replyBox, { backgroundColor: theme.light }]}>
-          <Text style={[styles.replyLabel, { color: theme.accent }]}>{t('Your reply')}</Text>
-          <Text style={[styles.replyText, { color: palette.text }]}>{mail.reply}</Text>
-          {reactionEmoji && (
-            <View style={styles.reactionRow}>
-              <Text style={styles.reactionEmoji}>{reactionEmoji}</Text>
-              <Text style={[styles.reactionText, { color: palette.textSecondary }]}>
-                {t('the fan loved your reply')}{' '}
-              </Text>
-            </View>
-          )}
+      {/* Member answers */}
+      {answers.length > 0 && (
+        <View style={[styles.answersWrap, { borderColor: palette.border }]}>
+          {answers.map((a) => (
+            <AnswerRow key={a.id} answer={a} member={nameOf(a.member_id)} />
+          ))}
         </View>
-      ) : (
-        <PrimaryButton label={t('Write a Reply 💗')} onPress={onReply} />
       )}
-    </RoundedCard>
+
+      {waitingForMe ? (
+        <Pressable
+          onPress={onAnswer}
+          style={[styles.answerButton, { backgroundColor: theme.light, borderColor: theme.primary }]}
+        >
+          <Ionicons name="chatbubble-ellipses" size={15} color={theme.primary} />
+          <Text style={[styles.answerButtonText, { color: theme.primary }]}>
+            {t('Answer this fan 💗')}
+          </Text>
+        </Pressable>
+      ) : (
+        <Pressable
+          onPress={onAnswer}
+          style={[styles.answerButton, { backgroundColor: palette.card, borderColor: palette.border }]}
+        >
+          <Ionicons name="create-outline" size={15} color={palette.textSecondary} />
+          <Text style={[styles.answerButtonText, { color: palette.textSecondary }]}>
+            {t('Edit your reply')}
+          </Text>
+        </Pressable>
+      )}
+      <View style={styles.countRow}>
+        <Text style={[styles.countText, { color: palette.textFaint }]}>
+          {answers.length}/{profiles.length} {t('members answered')}
+        </Text>
+      </View>
+    </GradientCard>
   );
 }
 
-function EmptyState({
-  emoji,
-  title,
-  subtitle,
-  actionLabel,
-  onAction,
-}: {
-  emoji: string;
-  title: string;
-  subtitle: string | null;
-  actionLabel?: string;
-  onAction?: () => void;
-}) {
+function AnswerRow({ answer, member }: { answer: FanAnswer; member?: Profile }) {
   const { palette } = useAppTheme();
-  const { t } = useI18n();
+  const memberTheme = member ? { color: themeColorFor(member) } : { color: palette.text };
   return (
-    <View style={styles.empty}>
-      <Text style={styles.emptyEmoji}>{emoji}</Text>
-      <Text style={[styles.emptyTitle, { color: palette.text }]}>{title}</Text>
-      {subtitle ? (
-        <Text style={[styles.emptySubtitle, { color: palette.textSecondary }]}>{subtitle}</Text>
-      ) : null}
-      {actionLabel && onAction ? (
-        <View style={{ marginTop: 16 }}>
-          <PrimaryButton label={actionLabel} onPress={onAction} />
-        </View>
-      ) : null}
-      <Text style={[styles.emptyHint, { color: palette.textFaint }]}>{t('Fan Mail 💌')}</Text>
+    <View style={styles.answerRow}>
+      <Text style={[styles.answerEmoji]}>{member?.emoji ?? '💗'}</Text>
+      <View style={styles.answerBody}>
+        <Text style={[styles.answerName, memberTheme]}>{member?.display_name ?? 'Member'}</Text>
+        <Text style={[styles.answerText, { color: palette.text }]}>{answer.answer}</Text>
+        {answer.reaction ? (
+          <Text style={[styles.reactionText, { color: palette.textFaint }]}>
+            {REACTION_EMOJI[answer.reaction]} {t9n(answer.reaction)}
+          </Text>
+        ) : null}
+      </View>
     </View>
   );
+}
+
+/** Tiny helper: member theme accent (kept soft, no full palettes here). */
+function themeColorFor(member: Profile): string {
+  return member.theme === 'sky' ? '#7EC8E3' : member.theme === 'pink' ? '#F4A7B9' : '#B79CED';
+}
+
+function t9n(reaction: string): string {
+  if (reaction === 'love') return 'the fan loved this reply';
+  if (reaction === 'cry') return 'the fan was touched';
+  return 'the fan got hyped!';
+}
+
+function relativeTime(iso: string, t: (k: string) => string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 1) return t('just now');
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h`;
+  return `${Math.floor(hours / 24)}d`;
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: 64,
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingBottom: 12,
-    gap: 12,
+    paddingTop: 14,
+    paddingBottom: 10,
   },
-  backButton: { padding: 4 },
-  flex: { flex: 1 },
-  title: { fontSize: 24, fontWeight: '800' },
-  subtitle: { fontSize: 12.5, marginTop: 2 },
-  bringButton: {
-    width: 44,
-    height: 44,
+  title: { fontSize: 20, fontWeight: '900' },
+  backButton: { padding: 6 },
+  askButton: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 16 },
+  askButtonText: { color: '#FFFFFF', fontWeight: '800', fontSize: 12.5 },
+  scroll: { padding: 16, paddingTop: 6, paddingBottom: 40, gap: 12 },
+  emptyCard: { alignItems: 'center', paddingVertical: 36, gap: 10 },
+  emptyEmoji: { fontSize: 40 },
+  emptyText: { fontSize: 13, textAlign: 'center' },
+  card: { padding: 16, gap: 10 },
+  fanRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  fanEmoji: { fontSize: 24 },
+  fanMeta: { flexShrink: 1 },
+  fanName: { fontSize: 14, fontWeight: '800' },
+  fanTime: { fontSize: 11 },
+  questionText: { fontSize: 14.5, lineHeight: 21, fontWeight: '600' },
+  answersWrap: { borderTopWidth: 1, paddingTop: 10, gap: 10, marginTop: 2 },
+  answerRow: { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
+  answerEmoji: { fontSize: 18, marginTop: 1 },
+  answerBody: { flexShrink: 1 },
+  answerName: { fontSize: 12.5, fontWeight: '800' },
+  answerText: { fontSize: 13, lineHeight: 19, marginTop: 1 },
+  reactionText: { fontSize: 11.5, fontStyle: 'italic', marginTop: 3 },
+  answerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    paddingVertical: 9,
     borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  bringEmoji: { fontSize: 20 },
-  unreadChip: {
-    alignSelf: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 999,
-    marginBottom: 4,
-  },
-  unreadText: { fontSize: 12.5, fontWeight: '700' },
-  list: { flex: 1, paddingHorizontal: 16 },
-  card: { marginBottom: 14, padding: 16 },
-  fanRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
-  fanAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  fanAvatarEmoji: { fontSize: 18 },
-  fanName: { fontSize: 14.5, fontWeight: '700' },
-  fanTime: { fontSize: 11.5, marginTop: 1 },
-  letterMark: { fontSize: 16 },
-  question: { fontSize: 15.5, lineHeight: 22, fontWeight: '500' },
-  replyBox: { borderRadius: RADIUS.md, padding: 14, marginTop: 12, gap: 6 },
-  replyLabel: { fontSize: 11.5, fontWeight: '800', textTransform: 'uppercase' },
-  replyText: { fontSize: 14.5, lineHeight: 21 },
-  reactionRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
-  reactionEmoji: { fontSize: 16 },
-  reactionText: { fontSize: 12.5 },
-  replyOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  replyCard: { margin: 12, marginBottom: 28, padding: 18, gap: 12 },
-  replyTitle: { fontSize: 17, fontWeight: '800' },
-  replyInput: {
     borderWidth: 1,
-    borderRadius: RADIUS.md,
-    padding: 12,
-    minHeight: 90,
-    fontSize: 15,
+    marginTop: 2,
+  },
+  answerButtonText: { fontSize: 13, fontWeight: '700' },
+  countRow: { alignItems: 'center' },
+  countText: { fontSize: 11 },
+  backdrop: { flex: 1, justifyContent: 'flex-end', alignItems: 'center' },
+  backdropFill: { flex: 1, justifyContent: 'flex-end', alignItems: 'center', width: '100%' },
+  sheetAnchor: { width: '100%', maxWidth: 520, padding: 12, paddingBottom: 24 },
+  sheet: { padding: 18, gap: 12 },
+  sheetHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  sheetTitle: { fontSize: 16, fontWeight: '800' },
+  closeButton: { padding: 6 },
+  sheetQuestion: { fontSize: 13.5, lineHeight: 20, fontStyle: 'italic' },
+  answerInput: {
+    minHeight: 110,
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 14,
+    fontSize: 14,
     textAlignVertical: 'top',
   },
-  laterButton: { alignItems: 'center', paddingVertical: 10 },
-  laterText: { fontSize: 14, fontWeight: '600' },
-  empty: { alignItems: 'center', paddingHorizontal: 40, paddingVertical: 60 },
-  emptyEmoji: { fontSize: 44 },
-  emptyTitle: { fontSize: 16, fontWeight: '700', marginTop: 12, textAlign: 'center' },
-  emptySubtitle: { fontSize: 13.5, marginTop: 6, textAlign: 'center', lineHeight: 19 },
-  emptyHint: { fontSize: 10, marginTop: 24 },
+  sendButton: { paddingVertical: 13, borderRadius: 16, alignItems: 'center' },
+  sendButtonText: { fontWeight: '800', fontSize: 14 },
 });
