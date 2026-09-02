@@ -20,6 +20,28 @@ export async function fetchActivities(limit = 30): Promise<Activity[]> {
 }
 
 /**
+ * Subscribe to new activities (other members' doings) in realtime.
+ * Returns an unsubscribe function. Mock mode: no-op (activities are
+ * only ever created by the local user in mock mode).
+ */
+export function subscribeToActivities(onChange: (activity: Activity) => void): () => void {
+  if (!isSupabaseConfigured) {
+    return () => {}; // nothing to watch in mock mode
+  }
+  const channel = getSupabase()
+    .channel('mikrokosmos-activities')
+    .on(
+      'postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'activities' },
+      (payload) => onChange(payload.new as Activity)
+    )
+    .subscribe();
+  return () => {
+    getSupabase().removeChannel(channel);
+  };
+}
+
+/**
  * Record an activity. `text` is pre-rendered ("Jessy added breakfast 🍓")
  * so the feed renders instantly without joins.
  * `referenceId` optionally links to a related record (e.g., meal_id).

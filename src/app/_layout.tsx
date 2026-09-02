@@ -12,6 +12,7 @@ import { I18nProvider } from '@/core/i18n/I18nProvider';
 import { AppearanceProvider, useAppearanceMode } from '@/core/appearance/AppearanceProvider';
 import { LoadingView } from '@/components/LoadingView';
 import { bindNudgeNavigation, configureNotifications } from '@/services/nudges';
+import { SocialHub } from '@/features/social/SocialHub';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -68,7 +69,8 @@ function AppStack({ ready }: { ready: boolean }) {
   if (!ready) return <LoadingView />;
 
   return (
-    <NavigationThemeProvider
+    <SocialHub>
+      <NavigationThemeProvider
       value={{
         dark: mode === 'dark',
         colors: {
@@ -105,5 +107,6 @@ function AppStack({ ready }: { ready: boolean }) {
         <Stack.Screen name="fan-mail" options={{ animation: 'slide_from_bottom' }} />
       </Stack>
     </NavigationThemeProvider>
+    </SocialHub>
   );
 }

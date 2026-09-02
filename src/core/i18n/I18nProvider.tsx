@@ -431,6 +431,10 @@ const ID: Record<string, string> = {
     'Isi tinggi, berat, dan usia untuk membuka target cerdasmu.',
   'Healthy range in ~{n} days at this gentle pace ✨':
     'Rentang sehat dalam ~{n} hari dengan ritme lembut ini ✨',
+
+  // ── Social toasts (friends' activity + chat) ─────────────────────
+  'New message from': 'Pesan baru dari',
+  'is glowing': 'sedang berkilau',
 };
 
 export interface I18nContextValue {
@@ -508,4 +512,5 @@ export function useI18n() {
 
 
 
-
+
+
