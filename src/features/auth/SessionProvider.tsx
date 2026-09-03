@@ -99,6 +99,13 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         const loaded = await loadProfile(session.user.id);
         setSessionUsername(loaded?.username ?? null);
         setProfile(loaded);
+        // Cold start with an existing session: onAuthStateChange won't fire
+        // (INITIAL_SESSION already happened) — register for push here too.
+        if (loaded) {
+          registerForPush(loaded.id).then((token) => {
+            lastPushToken.current = token;
+          });
+        }
       }
       if (mounted) setIsLoading(false);
 
