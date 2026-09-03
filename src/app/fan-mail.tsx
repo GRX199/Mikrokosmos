@@ -62,6 +62,12 @@ export default function FanMailScreen() {
   const answerInputRef = useRef<TextInput>(null);
   const closeAnswerSheet = useCallback(() => {
     answerInputRef.current?.blur();
+    // On web, focus may sit on the submit/close Pressable itself — blur
+    // whatever DOM element holds focus inside the modal before hiding it.
+    if (Platform.OS === 'web') {
+      const el = document.activeElement as HTMLElement | null;
+      if (el && el.tagName !== 'BODY') el.blur();
+    }
     setAnswering(null);
   }, []);
 
@@ -128,7 +134,11 @@ export default function FanMailScreen() {
     const text = answerDraft.trim();
     if (!text) return;
     const target = answering;
-    setAnswering(null);
+    // Route every close through closeAnswerSheet — it blurs the focused
+    // element (input OR the submit/close Pressable itself) BEFORE the
+    // modal is hidden, so react-native-web never renders a focused
+    // element inside an aria-hidden container (a11y warning).
+    closeAnswerSheet();
     try {
       const saved = await answerFanQuestion(target.id, profile.id, text);
       setQuestions((prev) =>

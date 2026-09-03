@@ -11,7 +11,7 @@ import { ThemeProvider, useAppTheme } from '@/core/theme';
 import { I18nProvider } from '@/core/i18n/I18nProvider';
 import { AppearanceProvider, useAppearanceMode } from '@/core/appearance/AppearanceProvider';
 import { LoadingView } from '@/components/LoadingView';
-import { bindNudgeNavigation, configureNotifications } from '@/services/nudges';
+import { bindNudgeNavigation, configureNotifications, ensurePermission } from '@/services/nudges';
 import { SocialHub } from '@/features/social/SocialHub';
 
 SplashScreen.preventAutoHideAsync();
@@ -41,6 +41,14 @@ export default function RootLayout() {
 
 function RootNavigator() {
   const { profile, isLoading } = useAuth();
+
+  // Ask for notification permission once per login (Android 13+ requires an
+  // explicit ask; without it social/chat notifications fail silently).
+  useEffect(() => {
+    if (!isLoading && profile) {
+      ensurePermission().catch(() => undefined);
+    }
+  }, [isLoading, profile]);
 
   useEffect(() => {
     if (!isLoading) SplashScreen.hideAsync();
