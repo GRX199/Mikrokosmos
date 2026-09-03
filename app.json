@@ -31,7 +31,13 @@
     },
     "plugins": [
       "expo-router",
-      "expo-notifications",
+      [
+        "expo-notifications",
+        {
+          "color": "#B79CED"
+        }
+      ],
+      "./plugins/with-fcm.js",
       [
         "expo-splash-screen",
         {
