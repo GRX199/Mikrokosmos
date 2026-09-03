@@ -6,6 +6,7 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 
@@ -14,6 +15,7 @@ import { getSupabase, isSupabaseConfigured } from '@/core/services/supabase';
 import { setSessionUsername } from '@/core/session/bridge';
 import type { Profile } from '@/models';
 import { fetchProfile } from '@/repositories/profiles';
+import { registerForPush, unregisterPush } from '@/services/push';
 import { MOCK_PROFILES } from '@/repositories/mockStore';
 
 /**
@@ -48,6 +50,8 @@ const AuthContext = createContext<AuthContextValue>({
 export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [profile, setProfile] = useState<Profile | null>(null);
+  // Push token of THIS install, so signOut can unregister just this device.
+  const lastPushToken = useRef<string | null>(null);
 
   const loadProfile = useCallback(async (userId: string): Promise<Profile | null> => {
     if (!isSupabaseConfigured) {
@@ -104,7 +108,17 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
           const loaded = await loadProfile(newSession.user.id);
           setSessionUsername(loaded?.username ?? null);
           setProfile(loaded);
+          // Register this install for server push (no-op on web/mock).
+          // Fire-and-forget: never block login on it.
+          if (loaded) {
+            registerForPush(loaded.id).then((token) => {
+              lastPushToken.current = token;
+            });
+          }
         } else {
+          // Signed out (or token revoked): stop pushing to this device.
+          unregisterPush(lastPushToken.current).catch(() => {});
+          lastPushToken.current = null;
           setSessionUsername(null);
           setProfile(null);
         }

@@ -15,6 +15,7 @@
 import { Platform } from 'react-native';
 
 import type { AppLanguage } from '@/core/i18n/I18nProvider';
+import { isPushChatVisible } from '@/services/push';
 
 type NotificationsModule = typeof import('expo-notifications');
 
@@ -45,12 +46,20 @@ export async function configureNotifications(): Promise<void> {
   configured = true;
 
   N.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowBanner: true,
-      shouldShowList: true,
-      shouldPlaySound: false,
-      shouldSetBadge: false,
-    }),
+    handleNotification: async (notification) => {
+      // Server push for chat: suppress the banner when the chat screen is
+      // already on top — the realtime toast already showed it (gentle, no
+      // double notifications). Local nudges behave as before.
+      const isChatPush = notification.request.content.data?.screen === 'mikrokosmos';
+      const chatVisible = isPushChatVisible();
+      const show = !(isChatPush && chatVisible);
+      return {
+        shouldShowBanner: show,
+        shouldShowList: show,
+        shouldPlaySound: false,
+        shouldSetBadge: false,
+      };
+    },
   });
 }
 

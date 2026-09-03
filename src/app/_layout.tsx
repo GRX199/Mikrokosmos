@@ -12,6 +12,7 @@ import { I18nProvider } from '@/core/i18n/I18nProvider';
 import { AppearanceProvider, useAppearanceMode } from '@/core/appearance/AppearanceProvider';
 import { LoadingView } from '@/components/LoadingView';
 import { bindNudgeNavigation, configureNotifications, ensurePermission } from '@/services/nudges';
+import { bindPushResponseNavigation } from '@/services/push';
 import { SocialHub } from '@/features/social/SocialHub';
 
 SplashScreen.preventAutoHideAsync();
@@ -41,6 +42,7 @@ export default function RootLayout() {
 
 function RootNavigator() {
   const { profile, isLoading } = useAuth();
+  const router = useRouter();
 
   // Ask for notification permission once per login (Android 13+ requires an
   // explicit ask; without it social/chat notifications fail silently).
@@ -49,6 +51,16 @@ function RootNavigator() {
       ensurePermission().catch(() => undefined);
     }
   }, [isLoading, profile]);
+
+  // Tapping a server-push chat notification opens the chat tab (also when
+  // the app was killed and the notification tap COLD-STARTS it).
+  useEffect(() => {
+    if (!isLoading && profile) {
+      bindPushResponseNavigation(() => {
+        router.push('/(tabs)/mikrokosmos');
+      });
+    }
+  }, [isLoading, profile, router]);
 
   useEffect(() => {
     if (!isLoading) SplashScreen.hideAsync();

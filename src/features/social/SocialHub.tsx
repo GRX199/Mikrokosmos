@@ -22,6 +22,7 @@ import { useAuth } from '@/features/auth/SessionProvider';
 import { subscribeToActivities } from '@/repositories/activities';
 import { subscribeToMessages } from '@/repositories/chat';
 import { fetchProfiles } from '@/repositories/profiles';
+import { setPushChatVisible } from '@/services/push';
 import {
   activityToSocialEvent,
   handleSocialEvent,
@@ -60,6 +61,9 @@ export function SocialHub({ children }: { children: React.ReactNode }) {
   const isChatRoute = pathname === '/mikrokosmos';
   useEffect(() => {
     setChatScreenVisible(isChatRoute);
+    // Also feeds the push-notification suppressor (banner hidden when the
+    // chat screen is already showing the message via realtime).
+    setPushChatVisible(isChatRoute);
   }, [isChatRoute]);
 
   // AppState (background detection) + global realtime subscriptions.
