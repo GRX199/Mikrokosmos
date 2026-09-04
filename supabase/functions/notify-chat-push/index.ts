@@ -57,10 +57,17 @@ Deno.serve(async (req: Request) => {
     });
   }
 
-  const supabase = createClient(
-    Deno.env.get('SUPABASE_URL') ?? '',
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-  );
+  // Legacy JWT service_role key (set manually as SVC_ROLE_JWT — the default
+  // SUPABASE_SERVICE_ROLE_KEY is the new sb_secret_ format, which this
+  // project's PostgREST does not recognize yet → permission denied).
+  const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+  const serviceKey = Deno.env.get('SVC_ROLE_JWT') ?? Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+  if (!supabaseUrl || !serviceKey) {
+    return new Response(JSON.stringify({ sent: 0 }), {
+      headers: { ...CORS, 'Content-Type': 'application/json' },
+    });
+  }
+  const supabase = createClient(supabaseUrl, serviceKey);
 
   // Who sent it?
   const { data: sender } = await supabase
@@ -123,9 +130,11 @@ Deno.serve(async (req: Request) => {
     sent = entries.filter((d) => d?.status === 'ok').length;
 
     // Housekeeping: drop tokens for uninstalled/logged-out devices.
-    // Expo returns one entry per message, in order.
+    // Only permanent device failures — NOT credential/config errors (those
+    // must never nuke the whole token table again).
     entries.forEach((d, idx) => {
-      if (d?.status === 'error' && /not registered|invalid|no such user/i.test(d.details?.error ?? '')) {
+      const err = String(d?.details?.error ?? d?.message ?? '');
+      if (d?.status === 'error' && /DeviceNotRegistered|no such user/i.test(err)) {
         if (messages[idx]) staleTokens.push(messages[idx].to);
       }
     });

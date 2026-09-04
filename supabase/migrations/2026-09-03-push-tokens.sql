@@ -50,10 +50,15 @@ begin
   -- Shared secret from the Supabase vault (set once, see instructions at
   -- the bottom of this file). Missing secret = push not configured yet:
   -- skip silently, the app still works (local notifications only).
+  --
+  -- NOTE (2026-09 platform vault API): read the decrypted value from the
+  -- vault.decrypted_secrets VIEW (the old vault.decrypted_secret(uuid)
+  -- function no longer exists; vault.secrets.secret is ciphertext).
   begin
-    v_secret := vault.decrypted_secret(
-      (select id from vault.secrets where name = 'PUSH_CALL_SECRET')
-    );
+    select decrypted_secret::text into v_secret
+    from vault.decrypted_secrets
+    where name = 'PUSH_CALL_SECRET'
+    limit 1;
   exception when others then
     v_secret := null;
   end;
@@ -72,7 +77,8 @@ begin
       'sender_id',  new.sender_id,
       'text',       new.message
     ),
-    timeout_ms := 5000
+    -- pg_net 0.20.x names this parameter timeout_milliseconds
+    timeout_milliseconds := 5000
   );
   return new;
 end;
