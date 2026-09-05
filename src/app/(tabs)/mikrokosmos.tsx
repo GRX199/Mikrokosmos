@@ -51,6 +51,7 @@ export default function ChatScreen() {
   // Is the user reading near the bottom? If she scrolled up through
   // history, new messages must NOT yank her down.
   const nearBottomRef = useRef(true);
+  const sendingRef = useRef(false);
   // Last known content height — guards onContentSizeChange against
   // Android layout oscillation (keyboard/insets) re-yanking the scroll.
   const lastContentHeightRef = useRef<number | null>(null);
@@ -131,40 +132,28 @@ export default function ChatScreen() {
     return unsubscribe;
   }, [loadReactions]);
 
-  // Scroll to the newest message. Keyed by the LAST message id (not length!)
-  // so re-fetches that keep the same count — e.g. returning to the tab after
-  // a reload — still scroll to the bottom. NOTE: scrollToEnd() is a silent
-  // no-op on react-native-web in several layout states, so we jump to a huge
-  // offset instead — the browser clamps it to the real bottom.
-  const lastMessageId = messages.length ? messages[messages.length - 1].id : null;
-  useEffect(() => {
-    if (loading || !lastMessageId) return;
-    if (!nearBottomRef.current) return;
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        listRef.current?.scrollToOffset({ offset: 1e9, animated: false });
-      });
-    });
-  }, [loading, lastMessageId]);
+  // ─── Inverted chat list (index 0 = newest) ───────────────────────────────
+  // Android: a normal FlatList loses scroll position when the data array
+  // is replaced on refocus (blink + "blank until touched" + snap-to-top).
+  // Inverted lists keep offset 0 == newest message, so refocus needs no
+  // scroll juggling at all and the position survives data refreshes.
+  const invertedData = useMemo(() => [...messages].reverse(), [messages]);
 
-  // Also scroll when the tab regains focus (the list may have been hidden
-  // while inactive, which cancels scrolls on web). Returning to the chat
-  // always means: show the newest first. The 250ms timeout is a final
-  // safety net for slow layouts on mobile browsers.
-  useEffect(() => {
-    if (isFocused && messages.length > 0) {
-      requestAnimationFrame(() => {
-        listRef.current?.scrollToOffset({ offset: 1e9, animated: false });
-      });
-      const t = setTimeout(() => {
-        if (nearBottomRef.current) {
-          listRef.current?.scrollToOffset({ offset: 1e9, animated: false });
-        }
-      }, 250);
-      return () => clearTimeout(t);
-    }
-    return undefined;
-  }, [isFocused]);
+  // New message while pinned near bottom → FlatList stays visually at the
+  // newest (offset 0). No rAF scroll dance needed anymore.
+
+  // Also scroll when the tab regains focus. Returning to the chat always
+  // means: show the newest first.
+  useFocusEffect(
+    useCallback(() => {
+      if (messages.length > 0) {
+        // offset 0 in an inverted list IS the bottom (newest).
+        requestAnimationFrame(() => {
+          listRef.current?.scrollToOffset({ offset: 0, animated: false });
+        });
+      }
+    }, [messages.length])
+  );
 
   const replyPreview = useMemo(() => {
     if (!replyTo) return null;
@@ -173,7 +162,11 @@ export default function ChatScreen() {
   }, [replyTo, profileMap]);
 
   async function handleSend() {
-    if (!profile || !draft.trim() || sending) return;
+    // Synchronous ref guard: Android can fire onSubmitEditing twice in one
+    // tick (IME action + raw key event). State guards are async and lose the
+    // race, which double-sent the message.
+    if (!profile || !draft.trim() || sendingRef.current) return;
+    sendingRef.current = true;
     setSending(true);
     const text = draft.trim();
     setDraft('');
@@ -196,6 +189,7 @@ export default function ChatScreen() {
       // so the bot never gets duplicated across the 3 friends).
       void maybeAskMiko(text, profile);
     } finally {
+      sendingRef.current = false;
       setSending(false);
     }
   }
@@ -303,30 +297,43 @@ export default function ChatScreen() {
           </View>
         </View>
 
-        {/* Messages */}
+        {/* Messages — inverted list: offset 0 == newest message. This is
+            what real chat apps use; it kills the Android "blank until
+            touched" / snap-to-top / blink issues on refocus. */}
         <FlatList
           ref={listRef}
-          data={messages}
+          data={invertedData}
+          inverted
           keyExtractor={(item) => item.id}
-          contentContainerStyle={[styles.list, { paddingBottom: 130 }]}
+          contentContainerStyle={[styles.list, { paddingTop: 12 }]}
           onScroll={(e) => {
-            const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
-            const distanceFromBottom =
-              contentSize.height - layoutMeasurement.height - contentOffset.y;
-            // "Near bottom" with a little tolerance (60px) for imprecision.
-            nearBottomRef.current = distanceFromBottom < 60;
+            // Inverted list: offset 0 == newest (bottom). Scrolling UP in
+            // visual terms means the offset grows; distanceFromBottom is
+            // simply the offset itself.
+            const { contentOffset } = e.nativeEvent;
+            // "Near bottom" (newest) with a little tolerance (60px).
+            nearBottomRef.current = contentOffset.y < 60;
           }}
           scrollEventThrottle={16}
           onContentSizeChange={(_w, h) => {
-            // After any content GROWTH (new message, image load) pin to the
-            // newest message — but only when the list actually got taller.
-            // Without the height guard, Android layout oscillations (keyboard
-            // show/hide, image settle) made the list "yank" in a loop.
-            if (h > (lastContentHeightRef.current ?? 0) && isFocusedRef.current && nearBottomRef.current) {
-              listRef.current?.scrollToOffset({ offset: 1e9, animated: false });
-            }
+            // Track content height only — inverted lists at offset 0 stay
+            // pinned to the newest automatically; no scroll juggling.
             lastContentHeightRef.current = h;
           }}
+          ListHeaderComponent={
+            mikoTyping ? (
+              <View style={styles.mikoRow}>
+                <View style={[styles.mikoBubble, { backgroundColor: theme.light, borderColor: theme.primary }]}>
+                  <Text style={[styles.mikoName, { color: theme.accent }]}>
+                    {MIKO.emoji} Miko
+                  </Text>
+                  <Text style={[styles.mikoTypingText, { color: palette.textSecondary }]}>
+                    {t('thinking…')}
+                  </Text>
+                </View>
+              </View>
+            ) : null
+          }
           renderItem={({ item }) => (
             <MessageBubble
               message={item}
@@ -341,20 +348,6 @@ export default function ChatScreen() {
               onReply={() => setReplyTo(item)}
             />
           )}
-          ListFooterComponent={
-            mikoTyping ? (
-              <View style={styles.mikoRow}>
-                <View style={[styles.mikoBubble, { backgroundColor: theme.light, borderColor: theme.primary }]}>
-                  <Text style={[styles.mikoName, { color: theme.accent }]}>
-                    {MIKO.emoji} Miko
-                  </Text>
-                  <Text style={[styles.mikoTypingText, { color: palette.textSecondary }]}>
-                    {t('thinking…')}
-                  </Text>
-                </View>
-              </View>
-            ) : null
-          }
         />
 
         {/* Reply preview */}
@@ -392,6 +385,10 @@ export default function ChatScreen() {
               placeholderTextColor={palette.textFaint}
               style={[styles.input, { color: palette.text }]}
               multiline
+              returnKeyLabel={t('Send')}
+              returnKeyType="send"
+              blurOnSubmit={false}
+              submitBehavior="submit"
               onSubmitEditing={handleSend}
             />
             <Pressable
@@ -608,7 +605,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 12,
     flexGrow: 1,
-    justifyContent: 'flex-end',
+    // Inverted list: visual bottom (newest) is index 0 / offset 0. Empty
+    // space must sit at the visual TOP (far from the composer), so the
+    // content stays pinned to the bottom.
+    justifyContent: 'flex-start',
   },
   bubbleRow: {
     flexDirection: 'row',

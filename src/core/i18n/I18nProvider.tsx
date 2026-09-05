@@ -401,6 +401,7 @@ const ID: Record<string, string> = {
   'Reply to': 'Balas ke',
   'Write something warm…': 'Tulis sesuatu yang hangat…',
   'Send Reply 💗': 'Kirim Balasan 💗',
+  'Send': 'Kirim',
   'Write a Reply 💗': 'Tulis Balasan 💗',
   'Your reply': 'Balasanmu',
   'the fan loved your reply': 'fansmu menyukai balasanmu',
