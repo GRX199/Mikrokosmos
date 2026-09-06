@@ -76,6 +76,23 @@ export default function HomeScreen() {
       tomorrow.setHours(9, 30, 0, 0);
       scheduleNudge('morning_checkin', language, tomorrow).catch(() => undefined);
     }
+    // ─── Daily gentle nudges (water halfway + dinner meal-photo) ──────────
+    // Scheduled once the day's state is known; re-running is harmless because
+    // scheduleNudge cancels the previous one first. Times only matter when
+    // the app is NOT in the foreground — local nudges never interrupt her.
+    if (data && profile && data.checkins[profile.id]) {
+      const now = new Date();
+      const sip = new Date(now);
+      sip.setHours(14, 0, 0, 0); // afternoon water sip — halfway to dinner
+      const dinner = new Date(now);
+      dinner.setHours(19, 0, 0, 0); // dinner-time meal photo
+      const glasses = data.dayStats.water[profile.id] ?? 0;
+      const halfway = Math.ceil((data.goals[profile.id]?.water_goal ?? 8) / 2);
+      if (sip > now && glasses < halfway) {
+        scheduleNudge('water_early', language, sip).catch(() => undefined);
+      }
+      if (dinner > now) scheduleNudge('meal_photo', language, dinner).catch(() => undefined);
+    }
   }, [data, profile, language]);
 
   if (loading && !data) return <LoadingView label={t('Waking up your universe…')} />;
