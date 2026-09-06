@@ -52,12 +52,12 @@ function RootNavigator() {
     }
   }, [isLoading, profile]);
 
-  // Tapping a server-push chat notification opens the chat tab (also when
-  // the app was killed and the notification tap COLD-STARTS it).
+  // Tapping a server-push notification opens the screen it named: the chat
+  // tab (default, also cold-start) or the fan-mail board for fan Q&A pushes.
   useEffect(() => {
     if (!isLoading && profile) {
-      bindPushResponseNavigation(() => {
-        router.push('/(tabs)/mikrokosmos');
+      bindPushResponseNavigation((screen) => {
+        router.push(screen === 'fan-mail' ? '/fan-mail' : '/(tabs)/mikrokosmos');
       });
     }
   }, [isLoading, profile, router]);

@@ -120,23 +120,27 @@ export function isPushChatVisible(): boolean {
 }
 
 // ─── Notification response (tap) ──────────────────────────────────────────
-// Set at app start: tapping the notification jumps to the chat tab.
+// Set at app start: tapping the notification jumps to the screen the push
+// named (chat tab by default, fan-mail for fan Q&A pushes).
 
 let responseListener: { remove(): void } | null = null;
 
-export function bindPushResponseNavigation(onOpen: () => void): void {
+export function bindPushResponseNavigation(onOpen: (screen?: string) => void): void {
   const N = notifications();
   if (!N || responseListener) return;
 
-  responseListener = N.addNotificationResponseReceivedListener(() => {
-    onOpen();
+  const screenOf = (r: unknown): string | undefined =>
+    ((r as any)?.notification?.request?.content?.data?.screen as string | undefined) ?? undefined;
+
+  responseListener = N.addNotificationResponseReceivedListener((response) => {
+    onOpen(screenOf(response));
   });
 
   // Also handle the "app was killed, user tapped notification to open" case:
   // getLastNotificationResponseAsync fires on mount when the app was opened
   // from a notification.
   N.getLastNotificationResponseAsync?.().then((response) => {
-    if (response) onOpen();
+    if (response) onOpen(screenOf(response));
   });
 }
 
