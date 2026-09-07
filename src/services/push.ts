@@ -43,7 +43,10 @@ function platformLabel(): string {
  */
 export async function registerForPush(userId: string): Promise<string | null> {
   const N = notifications();
-  if (!N || !isSupabaseConfigured) return null;
+  if (!N || !isSupabaseConfigured) {
+    console.log('[push] skip: notifications module or supabase not configured', { isNative, isSupabaseConfigured });
+    return null;
+  }
 
   try {
     if (Platform.OS === 'android') {
@@ -57,7 +60,10 @@ export async function registerForPush(userId: string): Promise<string | null> {
     }
 
     const granted = await N.requestPermissionsAsync();
-    if (!granted.granted && !granted.canAskAgain) return null;
+    if (!granted.granted && !granted.canAskAgain) {
+      console.warn('[push] permission denied & cannot ask again');
+      return null;
+    }
 
     // SDK 53+: getExpoPushTokenAsync requires projectId (EAS). It lives in
     // app.json → extra.eas.projectId, which expo-constants exposes at runtime.
@@ -72,9 +78,12 @@ export async function registerForPush(userId: string): Promise<string | null> {
     const token = (
       await N.getExpoPushTokenAsync({ projectId })
     ).data;
-    if (!token) return null;
+    if (!token) {
+      console.warn('[push] getExpoPushTokenAsync returned empty');
+      return null;
+    }
 
-    await getSupabase().from('push_tokens').upsert(
+    const { data, error } = await getSupabase().from('push_tokens').upsert(
       {
         token,
         user_id: userId,
@@ -82,11 +91,16 @@ export async function registerForPush(userId: string): Promise<string | null> {
         updated_at: new Date().toISOString(),
       },
       { onConflict: 'token' }
-    );
+    ).select();
 
+    if (error) throw new Error(error.message);
+
+    console.log('[push] token registered ✓', token.slice(0, 25) + '…', 'for user', userId.slice(0, 8));
     return token;
-  } catch {
-    // Push is optional — never let it break login.
+  } catch (e) {
+    // Push is optional — never let it break login. But DO log it loudly:
+    // a silent failure here means the device never gets chat notifications.
+    console.warn('[push] REGISTER FAILED:', e instanceof Error ? e.message : String(e));
     return null;
   }
 }
